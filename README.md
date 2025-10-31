@@ -59,7 +59,7 @@ rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
 
-![Artery/Vein Segmentation Result](examples/artery_vein_segmentation_result.png)
+![Artery/Vein Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/artery_vein_segmentation_result.png)
 
 ### Optic Disc Segmentation
 
@@ -76,7 +76,7 @@ rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
 
-![Optic Disc Segmentation Result](examples/disc_segmentation_result.png)
+![Optic Disc Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/disc_segmentation_result.png)
 
 ### Fovea Detection
 
@@ -96,7 +96,7 @@ fovea_x = prediction[0, 0, 0].item()
 fovea_y = prediction[0, 0, 1].item()
 ```
 
-![Fovea Detection Result](examples/fovea_detection_result.png)
+![Fovea Detection Result](https://github.com/kapong/vascx_simplify/raw/main/examples/fovea_detection_result.png)
 
 ### Image Quality Assessment
 
@@ -116,7 +116,7 @@ prediction = model.predict(rgb_image)  # Returns [B, 3] with quality scores (alr
 q1_reject, q2_usable, q3_good = prediction[0].tolist()
 ```
 
-![Image Quality Classification Result](examples/quality_classification_result.png)
+![Image Quality Classification Result](https://github.com/kapong/vascx_simplify/raw/main/examples/quality_classification_result.png)
 
 ### Batch Processing
 
