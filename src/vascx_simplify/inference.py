@@ -177,6 +177,9 @@ class EnsembleBase(torch.nn.Module):
         self.inference_fn = self.tta_inference if self.tta else self.sliding_window_inference
 
         self.sw_batch_size: int = 16
+        
+        # Default batch size for predict() - can be overridden in subclasses
+        self.predict_batch_size: Optional[int] = None
 
     def load_torchscript(self, fpath: str) -> None:
         extra_files = {"config.yaml": ""}
@@ -228,22 +231,74 @@ class EnsembleBase(torch.nn.Module):
         pred /= len(tta_flips) + 1
         return pred  # NMCHW
 
-    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
+    def proba_process(
+        self, 
+        proba: torch.Tensor, 
+        bounds: Union[Optional[Dict[str, Any]], list], 
+        is_batch: bool = False
+    ) -> torch.Tensor:
+        """Process model output. Override in subclasses.
+        
+        Args:
+            proba: Raw model output
+            bounds: Bounds dict (single image) or list of dicts (batch)
+            is_batch: Whether input was a batch
+            
+        Returns:
+            Processed predictions
+        """
         return proba
 
-    def _prepare_input(self, img: torch.Tensor) -> Tuple[torch.Tensor, Optional[Dict[str, Any]]]:
-        """Common input preparation logic.
-
-        Applies transforms and moves to device with batch dimension.
-
+    def _is_batch_input(self, img: Any) -> bool:
+        """Detect if input is a batch of images.
+        
         Args:
-            img: Input image tensor
-
+            img: Input to check
+            
         Returns:
-            Tuple of (prepared image tensor, bounds dict or None)
+            True if input is a batch, False for single image
         """
-        img, bounds = self.transforms(img)
-        return img.to(self.device).unsqueeze(dim=0), bounds
+        if isinstance(img, (list, tuple)):
+            return len(img) > 0
+        if isinstance(img, torch.Tensor):
+            # Tensor [B, C, H, W] with B > 1 is batch
+            # Tensor [C, H, W] or [1, C, H, W] is single
+            return img.dim() == 4 and img.shape[0] > 1
+        return False
+
+    def _prepare_input(
+        self, 
+        img: Union[torch.Tensor, Any, list]
+    ) -> Tuple[torch.Tensor, Union[Optional[Dict[str, Any]], list], bool]:
+        """Prepare input with batch detection.
+        
+        Args:
+            img: Single image or batch of images
+            
+        Returns:
+            Tuple of (batched tensor, bounds, is_batch_input)
+        """
+        # Detect batch input
+        is_batch = self._is_batch_input(img)
+        
+        if is_batch:
+            # Handle list of images
+            if isinstance(img, (list, tuple)):
+                results = [self.transforms(im) for im in img]
+                tensors, bounds_list = zip(*results)
+                batched = torch.stack([t.to(self.device) for t in tensors])
+                return batched, list(bounds_list), True
+            # Handle batched tensor [B, C, H, W] where B > 1
+            elif isinstance(img, torch.Tensor) and img.dim() == 4:
+                # Apply transforms per image in batch
+                results = [self.transforms(img[i]) for i in range(img.shape[0])]
+                tensors, bounds_list = zip(*results)
+                batched = torch.stack([t.to(self.device) for t in tensors])
+                return batched, list(bounds_list), True
+        else:
+            # Single image - existing behavior
+            img, bounds = self.transforms(img)
+            return img.to(self.device).unsqueeze(dim=0), bounds, False
 
     def _run_inference(self, img: torch.Tensor) -> torch.Tensor:
         """Run inference using configured inference function.
@@ -256,12 +311,79 @@ class EnsembleBase(torch.nn.Module):
         """
         return self.inference_fn(img, **self.inference_config)
 
-    def predict(self, img: torch.Tensor) -> torch.Tensor:
-        img, bounds = self._prepare_input(img)
-        proba = self._run_inference(img)
+    def _predict_batch(
+        self, 
+        img: Union[torch.Tensor, Any, list], 
+        batch_size: Optional[int] = None
+    ) -> torch.Tensor:
+        """Predict with automatic batch splitting.
+        
+        Args:
+            img: Single image or batch of images
+            batch_size: Maximum batch size for inference. If None, uses model default.
+                       If input batch exceeds this, will split and process in chunks.
+        
+        Returns:
+            Predictions for all images
+        """
+        img_tensor, bounds, is_batch = self._prepare_input(img)
+        
+        # Get effective batch size
+        if batch_size is None:
+            batch_size = self.predict_batch_size
+        
+        current_batch_size = img_tensor.shape[0]
+        
+        # If batch size limit not set or batch fits, process all at once
+        if batch_size is None or current_batch_size <= batch_size:
+            proba = self._run_inference(img_tensor)
+            return self.proba_process(proba, bounds, is_batch)
+        
+        # Split into chunks and process
+        all_preds = []
+        for i in range(0, current_batch_size, batch_size):
+            end_idx = min(i + batch_size, current_batch_size)
+            chunk_img = img_tensor[i:end_idx]
+            
+            # Get corresponding bounds for this chunk
+            if isinstance(bounds, list):
+                chunk_bounds = bounds[i:end_idx]
+            else:
+                chunk_bounds = bounds
+            
+            # Process chunk
+            chunk_proba = self._run_inference(chunk_img)
+            chunk_pred = self.proba_process(
+                chunk_proba, 
+                chunk_bounds, 
+                is_batch=True  # Always True for chunks
+            )
+            all_preds.append(chunk_pred)
+        
+        # Concatenate results
+        return torch.cat(all_preds, dim=0)
 
-        """Returns the output averaged over models"""
-        return self.proba_process(proba, bounds)
+    def predict(
+        self, 
+        img: Union[torch.Tensor, Any, list],
+        batch_size: Optional[int] = None
+    ) -> torch.Tensor:
+        """Predict with automatic batch splitting.
+        
+        Args:
+            img: Single image (PIL.Image or Tensor [C,H,W]) or 
+                 batch (List of images or Tensor [B,C,H,W])
+            batch_size: Maximum batch size for inference. If None, uses self.predict_batch_size.
+                       Large batches will be automatically split into chunks.
+        
+        Returns:
+            Predictions tensor. Shape depends on model type:
+            - Segmentation: [B, H, W]
+            - Classification: [B, C]
+            - Regression: [B, M, D]
+            - Heatmap: [B, K, 2]
+        """
+        return self._predict_batch(img, batch_size)
 
 
 class EnsembleSegmentation(EnsembleBase):
@@ -273,11 +395,37 @@ class EnsembleSegmentation(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.sw_batch_size = 16
+        self.predict_batch_size = 4  # Default: process 4 images at once (memory-intensive)
 
-    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
-        proba = torch.mean(proba, dim=1)  # average over models (M)
+    def proba_process(
+        self, 
+        proba: torch.Tensor, 
+        bounds: Union[Optional[Dict[str, Any]], list],
+        is_batch: bool = False
+    ) -> torch.Tensor:
+        """Process segmentation output.
+        
+        Args:
+            proba: Raw model output [B, M, C, H, W]
+            bounds: Bounds dict (single) or list of dicts (batch)
+            is_batch: Whether input was a batch
+            
+        Returns:
+            Class predictions [B, H, W]
+        """
+        proba = torch.mean(proba, dim=1)  # Average over models (M)
         proba = torch.nn.functional.softmax(proba, dim=1)
-        proba = self.transforms.undo_bounds(proba, bounds)
+        
+        # Handle bounds undo
+        if is_batch and isinstance(bounds, list):
+            results = [
+                self.transforms.undo_bounds(proba[i:i+1], bounds[i]) 
+                for i in range(len(bounds))
+            ]
+            proba = torch.cat(results, dim=0)
+        else:
+            proba = self.transforms.undo_bounds(proba, bounds)
+        
         proba = torch.argmax(proba, dim=1)
         return proba
 
@@ -291,22 +439,75 @@ class ClassificationEnsemble(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.inference_fn = None
+        self.predict_batch_size = 16  # Default: process 16 images at once (lightweight)
 
     def forward(self, img: torch.Tensor) -> torch.Tensor:
         return self.ensemble(img)
 
-    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
+    def proba_process(
+        self, 
+        proba: torch.Tensor, 
+        bounds: Union[Optional[Dict[str, Any]], list],
+        is_batch: bool = False
+    ) -> torch.Tensor:
+        """Process classification output.
+        
+        Args:
+            proba: Raw model output [B, M, C] or [B, C]
+            bounds: Bounds dict (single) or list of dicts (batch) - unused for classification
+            is_batch: Whether input was a batch
+            
+        Returns:
+            Softmax probabilities [B, C]
+        """
         proba = torch.nn.functional.softmax(proba, dim=-1)
-        proba = torch.mean(proba, dim=0)  # average over models
+        # Average over models if ensemble dimension exists
+        if proba.dim() == 3:  # [B, M, C]
+            proba = torch.mean(proba, dim=1)  # Average over models -> [B, C]
         return proba
 
-    def predict(self, img: torch.Tensor) -> torch.Tensor:
-        img, bounds = self._prepare_input(img)
-        with torch.no_grad():
-            proba = self.forward(img)
-
-        """Returns the output averaged over models"""
-        return self.proba_process(proba, bounds)
+    def predict(
+        self, 
+        img: Union[torch.Tensor, Any, list],
+        batch_size: Optional[int] = None
+    ) -> torch.Tensor:
+        """Predict with automatic batch splitting for classification.
+        
+        Args:
+            img: Single image or batch of images
+            batch_size: Maximum batch size for inference
+            
+        Returns:
+            Classification probabilities [B, C]
+        """
+        img_tensor, bounds, is_batch = self._prepare_input(img)
+        
+        # Get effective batch size
+        if batch_size is None:
+            batch_size = self.predict_batch_size
+        
+        current_batch_size = img_tensor.shape[0]
+        
+        # If batch size limit not set or batch fits, process all at once
+        if batch_size is None or current_batch_size <= batch_size:
+            with torch.no_grad():
+                proba = self.forward(img_tensor)
+            return self.proba_process(proba, bounds, is_batch)
+        
+        # Split into chunks and process
+        all_preds = []
+        for i in range(0, current_batch_size, batch_size):
+            end_idx = min(i + batch_size, current_batch_size)
+            chunk_img = img_tensor[i:end_idx]
+            
+            with torch.no_grad():
+                chunk_proba = self.forward(chunk_img)
+            
+            chunk_bounds = bounds[i:end_idx] if isinstance(bounds, list) else bounds
+            chunk_pred = self.proba_process(chunk_proba, chunk_bounds, is_batch=True)
+            all_preds.append(chunk_pred)
+        
+        return torch.cat(all_preds, dim=0)
 
 
 class RegressionEnsemble(EnsembleBase):
@@ -318,20 +519,71 @@ class RegressionEnsemble(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.inference_fn = None
+        self.predict_batch_size = 16  # Default: process 16 images at once
 
     def forward(self, img: torch.Tensor) -> torch.Tensor:
         return self.ensemble(img)
 
-    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
+    def proba_process(
+        self, 
+        proba: torch.Tensor, 
+        bounds: Union[Optional[Dict[str, Any]], list],
+        is_batch: bool = False
+    ) -> torch.Tensor:
+        """Process regression output.
+        
+        Args:
+            proba: Raw model output [B, M, D] or [B, D]
+            bounds: Bounds dict (single) or list of dicts (batch) - unused for regression
+            is_batch: Whether input was a batch
+            
+        Returns:
+            Regression values [B, M, D] or [B, D]
+        """
         return proba
 
-    def predict(self, img: torch.Tensor) -> torch.Tensor:
-        img, bounds = self._prepare_input(img)
-        with torch.no_grad():
-            proba = self.forward(img)
-
-        """Returns the output averaged over models"""
-        return self.proba_process(proba, bounds)
+    def predict(
+        self, 
+        img: Union[torch.Tensor, Any, list],
+        batch_size: Optional[int] = None
+    ) -> torch.Tensor:
+        """Predict with automatic batch splitting for regression.
+        
+        Args:
+            img: Single image or batch of images
+            batch_size: Maximum batch size for inference
+            
+        Returns:
+            Regression outputs [B, M, D] or [B, D]
+        """
+        img_tensor, bounds, is_batch = self._prepare_input(img)
+        
+        # Get effective batch size
+        if batch_size is None:
+            batch_size = self.predict_batch_size
+        
+        current_batch_size = img_tensor.shape[0]
+        
+        # If batch size limit not set or batch fits, process all at once
+        if batch_size is None or current_batch_size <= batch_size:
+            with torch.no_grad():
+                proba = self.forward(img_tensor)
+            return self.proba_process(proba, bounds, is_batch)
+        
+        # Split into chunks and process
+        all_preds = []
+        for i in range(0, current_batch_size, batch_size):
+            end_idx = min(i + batch_size, current_batch_size)
+            chunk_img = img_tensor[i:end_idx]
+            
+            with torch.no_grad():
+                chunk_proba = self.forward(chunk_img)
+            
+            chunk_bounds = bounds[i:end_idx] if isinstance(bounds, list) else bounds
+            chunk_pred = self.proba_process(chunk_proba, chunk_bounds, is_batch=True)
+            all_preds.append(chunk_pred)
+        
+        return torch.cat(all_preds, dim=0)
 
 
 class HeatmapRegressionEnsemble(EnsembleBase):
@@ -343,14 +595,20 @@ class HeatmapRegressionEnsemble(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.sw_batch_size = 1
+        self.predict_batch_size = 2  # Default: process 2 images at once (memory-intensive)
 
-    def proba_process(self, heatmaps: torch.Tensor, bounds: Dict[str, Any]) -> torch.Tensor:
-        """
-        Vectorized heatmap processing - all operations on GPU with float32.
+    def proba_process(
+        self, 
+        heatmaps: torch.Tensor, 
+        bounds: Union[Dict[str, Any], list],
+        is_batch: bool = False
+    ) -> torch.Tensor:
+        """Vectorized heatmap processing - all operations on GPU with float32.
 
         Args:
             heatmaps: shape (B, M, K, H, W)
-            bounds: bounds for undo transform
+            bounds: bounds dict (single) or list of dicts (batch)
+            is_batch: Whether input was a batch
 
         Returns:
             outputs: shape (B, K, 2) in float32
@@ -378,6 +636,13 @@ class HeatmapRegressionEnsemble(EnsembleBase):
         outputs = torch.mean(outputs, dim=1)  # (B, K, 2)
 
         # Undo bounds transform
-        outputs = self.transforms.undo_bounds_points(outputs, bounds)
+        if is_batch and isinstance(bounds, list):
+            results = [
+                self.transforms.undo_bounds_points(outputs[i:i+1], bounds[i])
+                for i in range(len(bounds))
+            ]
+            outputs = torch.cat(results, dim=0)
+        else:
+            outputs = self.transforms.undo_bounds_points(outputs, bounds)
 
         return outputs  # (B, K, 2) in float32
