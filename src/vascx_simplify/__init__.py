@@ -7,12 +7,12 @@ Original work: https://github.com/Eyened/rtnls_vascx_models
 __version__ = "0.1.3"
 
 from .inference import (
-    sliding_window_inference,
+    ClassificationEnsemble,
     EnsembleBase,
     EnsembleSegmentation,
-    ClassificationEnsemble,
-    RegressionEnsemble,
     HeatmapRegressionEnsemble,
+    RegressionEnsemble,
+    sliding_window_inference,
 )
 from .preprocess import FundusContrastEnhance, VASCXTransform
 from .utils import from_huggingface
