@@ -151,13 +151,40 @@ predictions = model.predict(large_images)  # Auto-splits into chunks
 predictions = model.predict(images, batch_size=8)  # Process 8 at once
 ```
 
-**Performance**: Batch processing is typically 2-3x faster than processing images sequentially.
+**Key Features**:
+- 🚀 **2-3x faster** than processing images sequentially
+- 🛡️ **Automatic OOM prevention** - large batches split automatically
+- 🔄 **100% backward compatible** - existing single-image code works unchanged
+- ⚙️ **Configurable** - override batch size per call or use smart defaults
+- 📊 **Flexible inputs** - accepts PIL.Image, torch.Tensor, or lists of either
 
 **Memory Management**: Each model type has sensible default batch sizes:
 - **Segmentation**: 4 images (sliding window is memory-intensive)
 - **Classification**: 16 images (lightweight forward pass)
 - **Regression**: 16 images
 - **Heatmap**: 2 images (heatmaps are very memory-intensive)
+
+**Usage Patterns**:
+
+```python
+# Pattern 1: Batch processing a directory
+import glob
+from pathlib import Path
+
+image_paths = glob.glob('fundus_images/*.jpg')
+images = [Image.open(p) for p in image_paths]
+predictions = model.predict(images)  # Efficient batch processing
+
+# Pattern 2: Process with torch tensors
+tensors = [torch.randn(3, 512, 512) for _ in range(20)]
+predictions = model.predict(tensors)  # Works with tensors too
+
+# Pattern 3: Memory-constrained environment
+predictions = model.predict(images, batch_size=2)  # Smaller batches
+
+# Pattern 4: High-memory GPU
+predictions = model.predict(images, batch_size=16)  # Larger batches
+```
 
 **Backward Compatibility**: All existing single-image code works without modification:
 ```python
@@ -166,6 +193,13 @@ image = Image.open('fundus.jpg')
 pred = model.predict(image)  # Returns [1, H, W]
 result = pred[0]  # Access with [0] as before
 ```
+
+**Performance Tips**:
+- Use batch processing for 3+ images to see significant speedup
+- Default batch sizes are optimized for most GPUs (8-16GB VRAM)
+- Increase batch_size for high-memory GPUs (24GB+)
+- Decrease batch_size if you encounter OOM errors
+- List of tensors is slightly faster than list of PIL.Images
 
 See `examples/05_batch_processing.py` for a complete performance demonstration.
 
