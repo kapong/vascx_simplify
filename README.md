@@ -31,7 +31,7 @@ pip install -e .
 
 ## Requirements
 
-- Python >= 3.8
+- Python >= 3.12
 - PyTorch >= 1.10.0
 - kornia >= 0.6.0
 - scikit-learn >= 1.0.0
@@ -52,8 +52,7 @@ import torch
 
 # Load model
 model_path = from_huggingface('Eyened/vascx:artery_vein/av_july24.pt')
-transform = VASCXTransform(size=1024, have_ce=True, device='cuda')
-model = EnsembleSegmentation(model_path, transform, device='cuda')
+model = EnsembleSegmentation(model_path, VASCXTransform())
 
 # Predict
 rgb_image = Image.open('fundus.jpg')
@@ -69,8 +68,7 @@ from vascx_simplify import EnsembleSegmentation, VASCXTransform, from_huggingfac
 from PIL import Image
 
 model_path = from_huggingface('Eyened/vascx:disc/disc_july24.pt')
-transform = VASCXTransform(size=512, have_ce=True, device='cuda')
-model = EnsembleSegmentation(model_path, transform, device='cuda')
+model = EnsembleSegmentation(model_path, VASCXTransform(512))
 
 rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
@@ -85,8 +83,7 @@ from vascx_simplify import HeatmapRegressionEnsemble, VASCXTransform, from_huggi
 from PIL import Image
 
 model_path = from_huggingface('Eyened/vascx:fovea/fovea_july24.pt')
-transform = VASCXTransform(size=1024, have_ce=True, device='cuda')
-model = HeatmapRegressionEnsemble(model_path, transform, device='cuda')
+model = HeatmapRegressionEnsemble(model_path, VASCXTransform())
 
 rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, M, 2] with (x, y) coordinates
@@ -105,8 +102,7 @@ from PIL import Image
 import torch.nn.functional as F
 
 model_path = from_huggingface('Eyened/vascx:quality/quality.pt')
-transform = VASCXTransform(size=1024, have_ce=False, device='cuda')  # No contrast enhancement
-model = ClassificationEnsemble(model_path, transform, device='cuda')
+model = ClassificationEnsemble(model_path, VASCXTransform(have_ce=False))
 
 rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, M, 3] with quality scores
