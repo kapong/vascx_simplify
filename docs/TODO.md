@@ -40,88 +40,62 @@
 
 ---
 
-## 🔄 Phase 2: Extract Helper Functions (TODO)
+## ✅ Phase 2: Extract Helper Functions (COMPLETED)
 
 ### Priority: Medium | Risk: Low-Medium
 
-### Phase 2.1: Extract Coordinate Transform Helpers
+### Phase 2.1: Extract Coordinate Transform Helpers ✅
 **File:** `preprocess.py`
 
 **Objective:** Reduce code duplication in matrix operations
 
 **Refactorings:**
-- [ ] Extract `_invert_affine_matrix()` helper
-  ```python
-  def _invert_affine_matrix(M: torch.Tensor, device: torch.device) -> torch.Tensor:
-      """Convert 2x3 affine matrix to 3x3 and invert."""
-      M_3x3 = torch.cat([M.float(), torch.tensor([[0., 0., 1.]], device=device)], dim=0)
-      return torch.inverse(M_3x3)
-  ```
-- [ ] Extract `_transform_point_to_original()` helper for single point transformation
-- [ ] Replace 3 occurrences of matrix inversion logic with helper
-- [ ] Test: Verify outputs unchanged in `_get_bounds()`
+- [x] Extract `_invert_affine_matrix()` helper
+- [x] Extract `_transform_point_to_original()` helper for single point transformation
+- [x] Replace 3 occurrences of matrix inversion logic with helper
+- [x] Test: Verify outputs unchanged in `_get_bounds()`
 
-**Expected Impact:**
-- Reduce ~15 lines of duplicated code
-- Improve readability of coordinate transform logic
+**Impact:**
+- Reduced ~15 lines of duplicated code
+- Improved readability of coordinate transform logic
 
-### Phase 2.2: Extract Grid Management Helpers
+### Phase 2.2: Extract Grid Management Helpers ✅
 **File:** `preprocess.py`
 
 **Objective:** Simplify grid caching mechanism
 
 **Refactorings:**
-- [ ] Extract `_get_or_create_grid()` method
-  ```python
-  def _get_or_create_grid(
-      self, h: int, w: int, device: torch.device, dtype: torch.dtype
-  ) -> Tuple[torch.Tensor, torch.Tensor]:
-      """Get or create cached coordinate grids."""
-      cache_key = (h, w, device, dtype)
-      if cache_key not in self._grid_cache:
-          self._grid_cache[cache_key] = self._create_coordinate_grid(h, w, device, dtype)
-      return self._grid_cache[cache_key]
-  ```
-- [ ] Extract `_create_coordinate_grid()` method
-- [ ] Replace 3 occurrences of grid creation logic
-- [ ] Test: Verify caching still works correctly
+- [x] Extract `_get_or_create_grid()` method
+- [x] Extract `_create_coordinate_grid()` method
+- [x] Replace 2 occurrences of grid creation logic
+- [x] Test: Verify caching still works correctly
 
-**Expected Impact:**
-- Reduce ~20 lines of duplicated code
+**Impact:**
+- Reduced ~20 lines of duplicated code
 - Clearer separation of grid creation vs. caching
 
-### Phase 2.3: Extract Shape Handling in inference.py
+### Phase 2.3: Extract Shape Handling in inference.py ✅
 **File:** `inference.py`
 
 **Objective:** Simplify tensor shape initialization
 
 **Refactorings:**
-- [ ] Extract `_initialize_output_tensor()` helper
-  ```python
-  def _initialize_output_tensor(
-      first_pred: torch.Tensor,
-      batch_size: int, height: int, width: int,
-      device: torch.device, dtype: torch.dtype
-  ) -> Tuple[torch.Tensor, torch.Tensor]:
-      """Initialize output tensor with correct shape based on prediction dimensions."""
-      if first_pred.dim() == 5:  # (B, M, C, H, W)
-          _, n_models, n_classes, _, _ = first_pred.shape
-          output = torch.zeros((batch_size, n_models, n_classes, height, width), 
-                              device=device, dtype=dtype)
-          importance_map_exp = importance_map[None, None, None, :, :]
-      else:  # (B, C, H, W)
-          _, n_classes, _, _ = first_pred.shape
-          output = torch.zeros((batch_size, n_classes, height, width), 
-                              device=device, dtype=dtype)
-          importance_map_exp = importance_map[None, None, :, :]
-      return output, importance_map_exp
-  ```
-- [ ] Refactor `sliding_window_inference()` to use helper
-- [ ] Test: Verify sliding window outputs unchanged
+- [x] Extract `_initialize_output_tensor()` helper
+- [x] Refactor `sliding_window_inference()` to use helper
+- [x] Test: Verify sliding window outputs unchanged
 
-**Expected Impact:**
-- Reduce complexity in main sliding window function
+**Impact:**
+- Reduced complexity in main sliding window function
 - Easier to understand output tensor initialization
+
+### Phase 2 Verification ✅
+- [x] All helper methods work correctly
+- [x] Grid caching mechanism intact
+- [x] Preprocessing outputs unchanged
+- [x] Sliding window inference outputs unchanged
+- [x] No functional changes
+
+**Status:** ✅ COMPLETE - 1 commit, 100% backward compatible, ~45 lines of duplication removed
 
 ---
 
