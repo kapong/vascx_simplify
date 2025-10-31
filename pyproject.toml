@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vascx_simplify"
-version = "0.1.5"
+version = "0.1.6"
 description = "A PyTorch library for vessel and fundus image analysis (simplified rewrite)"
 readme = "README.md"
 requires-python = ">=3.12"

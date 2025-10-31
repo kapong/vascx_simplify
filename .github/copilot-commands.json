@@ -3,17 +3,17 @@
     {
       "name": "commit_major_version",
       "description": "Create a new major version release (X.0.0) for breaking changes",
-      "prompt": "Create a new major version release:\n1. Read the current version from pyproject.toml\n2. Increment the major version (X.0.0, reset minor and patch to 0)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to X.0.0'\n6. Create a git tag: vX.0.0\n7. Show the new version and next steps (push commits and tags)"
+      "prompt": "Create a new major version release:\n1. Read the current version from pyproject.toml\n2. Increment the major version (X.0.0, reset minor and patch to 0)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to X.0.0'\n6. Create a git tag: vX.0.0\n7. Push the commit: git push origin main\n8. Push the tag: git push origin vX.0.0\n9. Show the new version and confirm it was pushed"
     },
     {
       "name": "commit_minor_version",
       "description": "Create a new minor version release (0.X.0) for new features",
-      "prompt": "Create a new minor version release:\n1. Read the current version from pyproject.toml\n2. Increment the minor version (0.X.0, reset patch to 0)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to 0.X.0'\n6. Create a git tag: v0.X.0\n7. Show the new version and next steps (push commits and tags)"
+      "prompt": "Create a new minor version release:\n1. Read the current version from pyproject.toml\n2. Increment the minor version (0.X.0, reset patch to 0)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to 0.X.0'\n6. Create a git tag: v0.X.0\n7. Push the commit: git push origin main\n8. Push the tag: git push origin v0.X.0\n9. Show the new version and confirm it was pushed"
     },
     {
       "name": "commit_patch_version",
       "description": "Create a new patch version release (0.0.X) for bug fixes",
-      "prompt": "Create a new patch version release:\n1. Read the current version from pyproject.toml\n2. Increment the patch version (0.0.X)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to 0.0.X'\n6. Create a git tag: v0.0.X\n7. Show the new version and next steps (push commits and tags)"
+      "prompt": "Create a new patch version release:\n1. Read the current version from pyproject.toml\n2. Increment the patch version (0.0.X)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to 0.0.X'\n6. Create a git tag: v0.0.X\n7. Push the commit: git push origin main\n8. Push the tag: git push origin v0.0.X\n9. Show the new version and confirm it was pushed"
     },
     {
       "name": "create_plan",
