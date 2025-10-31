@@ -227,10 +227,34 @@ class EnsembleBase(torch.nn.Module):
     def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
         return proba
     
-    def predict(self, img: torch.Tensor) -> torch.Tensor:
+    def _prepare_input(self, img: torch.Tensor) -> Tuple[torch.Tensor, Optional[Dict[str, Any]]]:
+        """Common input preparation logic.
+        
+        Applies transforms and moves to device with batch dimension.
+        
+        Args:
+            img: Input image tensor
+            
+        Returns:
+            Tuple of (prepared image tensor, bounds dict or None)
+        """
         img, bounds = self.transforms(img)
-        img = img.to(self.device).unsqueeze(dim=0)
-        proba = self.inference_fn(img, **self.inference_config)
+        return img.to(self.device).unsqueeze(dim=0), bounds
+    
+    def _run_inference(self, img: torch.Tensor) -> torch.Tensor:
+        """Run inference using configured inference function.
+        
+        Args:
+            img: Prepared input tensor (already batched and on device)
+            
+        Returns:
+            Raw inference output
+        """
+        return self.inference_fn(img, **self.inference_config)
+    
+    def predict(self, img: torch.Tensor) -> torch.Tensor:
+        img, bounds = self._prepare_input(img)
+        proba = self._run_inference(img)
         
         """Returns the output averaged over models"""
         return self.proba_process(proba, bounds)
@@ -273,13 +297,12 @@ class ClassificationEnsemble(EnsembleBase):
         return proba
         
     def predict(self, img: torch.Tensor) -> torch.Tensor:
-        img, _ = self.transforms(img)
-        img = img.to(self.device).unsqueeze(dim=0)
+        img, bounds = self._prepare_input(img)
         with torch.no_grad():
             proba = self.forward(img)
         
         """Returns the output averaged over models"""
-        return self.proba_process(proba, None)
+        return self.proba_process(proba, bounds)
 
 
 class RegressionEnsemble(EnsembleBase):
@@ -299,13 +322,12 @@ class RegressionEnsemble(EnsembleBase):
         return proba
         
     def predict(self, img: torch.Tensor) -> torch.Tensor:
-        img, _ = self.transforms(img)
-        img = img.to(self.device).unsqueeze(dim=0)
+        img, bounds = self._prepare_input(img)
         with torch.no_grad():
             proba = self.forward(img)
         
         """Returns the output averaged over models"""
-        return self.proba_process(proba, None)
+        return self.proba_process(proba, bounds)
 
         
 class HeatmapRegressionEnsemble(EnsembleBase):

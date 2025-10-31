@@ -403,6 +403,50 @@ class FundusContrastEnhance:
         
         return radius, center, circle_fraction
     
+    def _fit_line_ransac(
+        self,
+        x_data: np.ndarray,
+        y_data: np.ndarray,
+        mask: np.ndarray,
+        is_horizontal: bool
+    ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+        """Fit a single line using RANSAC.
+        
+        Args:
+            x_data: X coordinates of all points
+            y_data: Y coordinates of all points
+            mask: Boolean mask selecting points for this line
+            is_horizontal: If True, fit horizontal line (predict y from x)
+                          If False, fit vertical line (predict x from y)
+        
+        Returns:
+            Tuple of (x_vals, y_vals) for the fitted line, or None if fit fails
+        """
+        if is_horizontal:
+            # Horizontal line: y = a*x + b
+            self.ransac_line.fit(x_data[mask].reshape(-1, 1), y_data[mask])
+        else:
+            # Vertical line: x = a*y + b
+            self.ransac_line.fit(y_data[mask].reshape(-1, 1), x_data[mask])
+        
+        # Check if fit is good (majority inliers)
+        if self.ransac_line.inlier_mask_.mean() <= 0.5:
+            return None
+        
+        a = self.ransac_line.estimator_.coef_[0]
+        b = self.ransac_line.estimator_.intercept_
+        
+        if is_horizontal:
+            # For horizontal lines: return (x_vals, y_vals)
+            x_vals = np.array([0, self.RESOLUTION])
+            y_vals = a * x_vals + b
+            return (x_vals, y_vals)
+        else:
+            # For vertical lines: return (y_vals, x_vals) reversed
+            x_vals = np.array([0, self.RESOLUTION])
+            y_vals = a * x_vals + b
+            return (y_vals[::-1], x_vals[::-1])
+    
     def _fit_lines(
         self, 
         xs: np.ndarray, 
@@ -422,23 +466,20 @@ class FundusContrastEnhance:
             radius = self.CIRCLE_REFIT_SCALE * np.sqrt(y[2] + (center**2).sum())
         
         lines = {}
+        
+        # Fit vertical lines (left, right) - predict x from y
         for loc in ["left", "right"]:
             mask = self.RECT_MASKS[loc]
-            self.ransac_line.fit(ys[mask].reshape(-1, 1), xs[mask])
-            if self.ransac_line.inlier_mask_.mean() > 0.5:
-                a, b = self.ransac_line.estimator_.coef_[0], self.ransac_line.estimator_.intercept_
-                x_vals = np.array([0, self.RESOLUTION])
-                y_vals = a * x_vals + b
-                lines[loc] = (y_vals[::-1], x_vals[::-1])
+            result = self._fit_line_ransac(xs, ys, mask, is_horizontal=False)
+            if result is not None:
+                lines[loc] = result
         
+        # Fit horizontal lines (top, bottom) - predict y from x
         for loc in ["top", "bottom"]:
             mask = self.RECT_MASKS[loc]
-            self.ransac_line.fit(xs[mask].reshape(-1, 1), ys[mask])
-            if self.ransac_line.inlier_mask_.mean() > 0.5:
-                a, b = self.ransac_line.estimator_.coef_[0], self.ransac_line.estimator_.intercept_
-                x_vals = np.array([0, self.RESOLUTION])
-                y_vals = a * x_vals + b
-                lines[loc] = (x_vals, y_vals)
+            result = self._fit_line_ransac(xs, ys, mask, is_horizontal=True)
+            if result is not None:
+                lines[loc] = result
         
         return lines
     
@@ -560,6 +601,78 @@ class FundusContrastEnhance:
         
         return enhanced
     
+    def _mirror_edge(
+        self,
+        mirrored: torch.Tensor,
+        bound_val: int,
+        size: int,
+        content_min: int,
+        content_max: int,
+        is_top_or_left: bool,
+        is_2d: bool,
+        dim_2d: int,
+        dim_3d: int
+    ) -> None:
+        """Mirror a single edge (top/bottom/left/right) in-place.
+        
+        Args:
+            mirrored: Tensor to modify in-place
+            bound_val: The boundary value (min_y, max_y, min_x, or max_x)
+            size: Total size along this dimension (h or w)
+            content_min: Content region minimum
+            content_max: Content region maximum
+            is_top_or_left: True for top/left edges, False for bottom/right
+            is_2d: Whether tensor is 2D
+            dim_2d: Dimension to flip for 2D tensors
+            dim_3d: Dimension to flip for 3D tensors
+        """
+        if is_top_or_left:
+            # Top or left edge
+            if bound_val <= 0:
+                return
+            flip_size = min(bound_val, content_max - content_min)
+            if is_2d:
+                if dim_2d == 0:  # top edge
+                    mirrored[:bound_val] = torch.flip(
+                        mirrored[bound_val:bound_val+flip_size], dims=[dim_2d]
+                    )[:bound_val]
+                else:  # left edge
+                    mirrored[:, :bound_val] = torch.flip(
+                        mirrored[:, bound_val:bound_val+flip_size], dims=[dim_2d]
+                    )[:, :bound_val]
+            else:
+                if dim_3d == 1:  # top edge
+                    mirrored[:, :bound_val] = torch.flip(
+                        mirrored[:, bound_val:bound_val+flip_size], dims=[dim_3d]
+                    )[:, :bound_val]
+                else:  # left edge
+                    mirrored[:, :, :bound_val] = torch.flip(
+                        mirrored[:, :, bound_val:bound_val+flip_size], dims=[dim_3d]
+                    )[:, :, :bound_val]
+        else:
+            # Bottom or right edge
+            if bound_val >= size:
+                return
+            flip_size = min(size - bound_val, content_max - content_min)
+            if is_2d:
+                if dim_2d == 0:  # bottom edge
+                    mirrored[bound_val:] = torch.flip(
+                        mirrored[bound_val-flip_size:bound_val], dims=[dim_2d]
+                    )[:size-bound_val]
+                else:  # right edge
+                    mirrored[:, bound_val:] = torch.flip(
+                        mirrored[:, bound_val-flip_size:bound_val], dims=[dim_2d]
+                    )[:, :size-bound_val]
+            else:
+                if dim_3d == 1:  # bottom edge
+                    mirrored[:, bound_val:] = torch.flip(
+                        mirrored[:, bound_val-flip_size:bound_val], dims=[dim_3d]
+                    )[:, :size-bound_val]
+                else:  # right edge
+                    mirrored[:, :, bound_val:] = torch.flip(
+                        mirrored[:, :, bound_val-flip_size:bound_val], dims=[dim_3d]
+                    )[:, :, :size-bound_val]
+    
     def _mirror_image(
         self, 
         image: torch.Tensor, 
@@ -591,33 +704,14 @@ class FundusContrastEnhance:
         max_x = min(rect['max_x'] - d, w)
         
         # Mirror edges using torch.flip (GPU) - works directly on uint8
-        if min_y > 0:
-            flip_h = min(min_y, max_y - min_y)
-            if is_2d:
-                mirrored[:min_y] = torch.flip(mirrored[min_y:min_y+flip_h], dims=[0])[:min_y]
-            else:
-                mirrored[:, :min_y] = torch.flip(mirrored[:, min_y:min_y+flip_h], dims=[1])[:, :min_y]
-        
-        if max_y < h:
-            flip_h = min(h - max_y, max_y - min_y)
-            if is_2d:
-                mirrored[max_y:] = torch.flip(mirrored[max_y-flip_h:max_y], dims=[0])[:h-max_y]
-            else:
-                mirrored[:, max_y:] = torch.flip(mirrored[:, max_y-flip_h:max_y], dims=[1])[:, :h-max_y]
-        
-        if min_x > 0:
-            flip_w = min(min_x, max_x - min_x)
-            if is_2d:
-                mirrored[:, :min_x] = torch.flip(mirrored[:, min_x:min_x+flip_w], dims=[1])[:, :min_x]
-            else:
-                mirrored[:, :, :min_x] = torch.flip(mirrored[:, :, min_x:min_x+flip_w], dims=[2])[:, :, :min_x]
-        
-        if max_x < w:
-            flip_w = min(w - max_x, max_x - min_x)
-            if is_2d:
-                mirrored[:, max_x:] = torch.flip(mirrored[:, max_x-flip_w:max_x], dims=[1])[:, :w-max_x]
-            else:
-                mirrored[:, :, max_x:] = torch.flip(mirrored[:, :, max_x-flip_w:max_x], dims=[2])[:, :, :w-max_x]
+        # Top edge
+        self._mirror_edge(mirrored, min_y, h, min_y, max_y, True, is_2d, 0, 1)
+        # Bottom edge
+        self._mirror_edge(mirrored, max_y, h, min_y, max_y, False, is_2d, 0, 1)
+        # Left edge
+        self._mirror_edge(mirrored, min_x, w, min_x, max_x, True, is_2d, 1, 2)
+        # Right edge
+        self._mirror_edge(mirrored, max_x, w, min_x, max_x, False, is_2d, 1, 2)
         
         # Mirror circle using cached grid coordinates (GPU, use compute dtype)
         x_grid, y_grid = self._get_or_create_grid(h, w, device, compute_dtype)
