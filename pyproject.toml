@@ -1,0 +1,111 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vascx-simplify"
+version = "0.1.0"
+description = "A PyTorch library for vessel and fundus image analysis (simplified rewrite)"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+# TODO: Add author information
+# authors = [
+#     {name = "Your Name", email = "your.email@example.com"},
+# ]
+keywords = ["pytorch", "medical-imaging", "fundus", "vessel-analysis", "computer-vision"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+dependencies = [
+    "torch>=1.10.0",
+    "kornia>=0.6.0",
+    "scikit-learn>=1.0.0",
+    "scipy>=1.7.0",
+    "numpy>=1.21.0",
+    "huggingface-hub>=0.10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=0.990",
+    "isort>=5.10.0",
+]
+
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pillow>=9.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kapong/vascx_simplify"
+Documentation = "https://github.com/kapong/vascx_simplify#readme"
+Repository = "https://github.com/kapong/vascx_simplify.git"
+"Bug Tracker" = "https://github.com/kapong/vascx_simplify/issues"
+"Original Work" = "https://github.com/Eyened/rtnls_vascx_models"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["simple_vascx*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=simple_vascx",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | \.eggs
+  | \.tox
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

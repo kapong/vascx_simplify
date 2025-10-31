@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # CPU-only testing
+  test-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - pip-cache:/root/.cache/pip
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+    command: pytest -v --cov=simple_vascx --cov-report=term-missing --cov-report=html
+
+  # GPU testing (requires nvidia-docker)
+  test-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cuda
+    volumes:
+      - .:/workspace
+      - pip-cache:/root/.cache/pip
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - NVIDIA_VISIBLE_DEVICES=all
+    runtime: nvidia
+    command: pytest -v --cov=simple_vascx --cov-report=term-missing --cov-report=html
+
+  # Development environment with shell access
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - pip-cache:/root/.cache/pip
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  # Build and verify the package
+  build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - pip-cache:/root/.cache/pip
+    command: >
+      bash -c "
+        python -m pip install --upgrade build &&
+        python -m build &&
+        pip install dist/*.whl &&
+        python -c 'import simple_vascx; print(simple_vascx.__version__)'
+      "
+
+volumes:
+  pip-cache:
