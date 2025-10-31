@@ -66,7 +66,7 @@ def main():
     preds_sequential = torch.stack([model.predict(img) for img in images_10])
     seq_time = time.time() - start
     
-    print(f"✅ Complete!")
+    print("✅ Complete!")
     print(f"   Total time: {seq_time:.2f}s")
     print(f"   Time per image: {seq_time/len(images_10):.3f}s")
     print(f"   Output shape: {preds_sequential.shape}")
@@ -83,7 +83,7 @@ def main():
     batch_time = time.time() - start
     
     speedup = seq_time / batch_time
-    print(f"✅ Complete!")
+    print("✅ Complete!")
     print(f"   Total time: {batch_time:.2f}s")
     print(f"   Time per image: {batch_time/len(images_10):.3f}s")
     print(f"   Speedup: {speedup:.2f}x faster")
@@ -100,7 +100,7 @@ def main():
     custom_time = time.time() - start
     
     speedup_custom = seq_time / custom_time
-    print(f"✅ Complete!")
+    print("✅ Complete!")
     print(f"   Total time: {custom_time:.2f}s")
     print(f"   Time per image: {custom_time/len(images_10):.3f}s")
     print(f"   Speedup vs sequential: {speedup_custom:.2f}x faster")
@@ -119,7 +119,7 @@ def main():
     preds_large = model.predict(large_images)
     large_time = time.time() - start
     
-    print(f"✅ Complete!")
+    print("✅ Complete!")
     print(f"   Total time: {large_time:.2f}s")
     print(f"   Time per image: {large_time/len(large_images):.3f}s")
     print(f"   Output shape: {preds_large.shape}")
