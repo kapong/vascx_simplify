@@ -14,6 +14,7 @@ This project was developed with significant assistance from AI tools (GitHub Cop
 - **Sliding Window Inference**: Efficient inference for large images
 - **Ensemble Models**: Segmentation, classification, regression, and heatmap-based models
 - **HuggingFace Integration**: Easy model loading from HuggingFace Hub
+- **Minimal Dependencies**: Uses fewer dependency libraries for easier installation and maintenance
 
 ## Installation
 
