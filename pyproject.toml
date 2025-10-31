@@ -3,16 +3,15 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vascx-simplify"
+name = "vascx_simplify"
 version = "0.1.0"
 description = "A PyTorch library for vessel and fundus image analysis (simplified rewrite)"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
-# TODO: Add author information
-# authors = [
-#     {name = "Your Name", email = "your.email@example.com"},
-# ]
+authors = [
+    {name = "kapong", email = "kapong@github.com"},
+]
 keywords = ["pytorch", "medical-imaging", "fundus", "vessel-analysis", "computer-vision"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -67,7 +66,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["simple_vascx*"]
+include = ["vascx_simplify*"]
 exclude = ["tests*"]
 
 [tool.pytest.ini_options]
@@ -78,7 +77,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "--verbose",
-    "--cov=simple_vascx",
+    "--cov=vascx_simplify",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]

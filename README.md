@@ -1,12 +1,24 @@
-# VASCX Simplify
+# vascx_simplify
 
-A PyTorch library for vessel and fundus image analysis, providing GPU-accelerated preprocessing, contrast enhancement, and inference utilities for medical imaging tasks.
+**⚠️ IMPORTANT: This project is NOT original work.**
 
-> **Note**: This is a simplified rewrite of the original [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) project by Eyened. This version focuses on making the core functionality more accessible and easier to use as a pip-installable library.
+This is a simplified rewrite of the original [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) project by Eyened. All core algorithms, preprocessing logic, and model architectures are derived from that original work.
 
 ## AI Usage Disclaimer
 
-Parts of this codebase were developed with assistance from AI tools (GitHub Copilot, ChatGPT, Claude) for code organization, documentation, testing infrastructure, and packaging setup. The core algorithms and models are based on the original work referenced above.
+**This project was developed with significant assistance from AI tools** (GitHub Copilot, ChatGPT, Claude). AI was used extensively for:
+- Code organization and refactoring
+- Documentation and comments
+- Testing infrastructure
+- Packaging and build configuration
+- Docker setup
+- CI/CD pipeline
+
+The underlying algorithms and models are from the original work referenced above.
+
+---
+
+A PyTorch library for vessel and fundus image analysis, providing GPU-accelerated preprocessing, contrast enhancement, and inference utilities for medical imaging tasks.
 
 ## Features
 
@@ -21,7 +33,7 @@ Parts of this codebase were developed with assistance from AI tools (GitHub Copi
 ### From PyPI (once published)
 
 ```bash
-pip install vascx-simplify
+pip install vascx_simplify
 ```
 
 ### From source
@@ -35,14 +47,14 @@ pip install -e .
 ### With uv (recommended)
 
 ```bash
-uv pip install vascx-simplify
+uv pip install vascx_simplify
 ```
 
 ## Quick Start
 
 ```python
 import torch
-from simple_vascx import VASCXTransform, EnsembleSegmentation, from_huggingface
+from vascx_simplify import VASCXTransform, EnsembleSegmentation, from_huggingface
 
 # Download model from HuggingFace
 model_path = from_huggingface("username/model-name:model.pt")
@@ -70,7 +82,7 @@ prediction = model.predict(image)
 ### Preprocessing Only
 
 ```python
-from simple_vascx import FundusContrastEnhance
+from vascx_simplify import FundusContrastEnhance
 import torch
 
 # Initialize enhancer
@@ -88,7 +100,7 @@ rgb, enhanced, bounds = enhancer(image)
 ### Sliding Window Inference
 
 ```python
-from simple_vascx import sliding_window_inference
+from vascx_simplify import sliding_window_inference
 import torch
 
 # Your model
@@ -117,8 +129,8 @@ output = sliding_window_inference(
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR-USERNAME/simple_vascx.git
-cd simple_vascx
+git clone https://github.com/kapong/vascx_simplify.git
+cd vascx_simplify
 
 # Install with development dependencies
 pip install -e ".[dev,test]"
@@ -126,46 +138,19 @@ pip install -e ".[dev,test]"
 
 ### Running Tests
 
-#### Local Testing
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=simple_vascx --cov-report=html
-
-# Run specific test file
-pytest tests/test_inference.py
-```
-
-#### Docker Testing
-
-```bash
-# CPU testing
-docker-compose up test-cpu
-
-# GPU testing (requires nvidia-docker)
-docker-compose up test-gpu
-
-# Development shell
-docker-compose run dev
-
-# Build package
-docker-compose up build
-```
+Tests have been removed from this simplified version.
 
 ### Code Quality
 
 ```bash
 # Format code
-black src/ tests/
+black src/
 
 # Sort imports
-isort src/ tests/
+isort src/
 
 # Lint code
-flake8 src/ tests/
+flake8 src/
 
 # Type checking
 mypy src/
@@ -183,24 +168,20 @@ mypy src/
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+This is a simplified rewrite for personal use. For contributions to the original work, please visit [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models).
 
 ## License
 
 MIT License - see LICENSE file for details.
 
-## Authors
-
-<!-- TODO: Add author information -->
-
 ## Citation
 
-If you use this library in your research, please cite:
+If you use this library in your research, please cite the original work:
 
 ```bibtex
 @software{vascx_simplify,
-  title = {VASCX Simplify: A PyTorch library for vessel and fundus image analysis},
-  author = {TODO: Add authors},
+  title = {vascx_simplify: Simplified rewrite of rtnls_vascx_models},
+  author = {kapong},
   year = {2025},
   url = {https://github.com/kapong/vascx_simplify},
   note = {Simplified rewrite of https://github.com/Eyened/rtnls_vascx_models}
@@ -209,7 +190,6 @@ If you use this library in your research, please cite:
 
 ## Acknowledgments
 
-- **Original Work**: This project is a simplified rewrite of [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) by Eyened
-- Built with PyTorch and Kornia
-- Sliding window inference implementation based on MONAI
-- Development assisted by AI tools for packaging, documentation, and testing infrastructure
+**Original Work**: [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) by Eyened - All core algorithms and models are from this original work.
+
+**AI Assistance**: This rewrite was created with extensive assistance from AI tools (GitHub Copilot, ChatGPT, Claude) for code organization, documentation, and packaging.

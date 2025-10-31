@@ -1,37 +1,44 @@
 # Acknowledgments
 
-## Original Work
+## ⚠️ IMPORTANT: This is NOT Original Work
 
-This project is a **simplified rewrite** of the original [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) repository by [Eyened](https://github.com/Eyened).
+**This project is a simplified rewrite of the original [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) repository by [Eyened](https://github.com/Eyened).**
 
-The original repository provided the core algorithms and model architectures for:
-- Fundus image contrast enhancement
+All core algorithms, preprocessing logic, model architectures, and inference implementations are derived from the original work. This rewrite only reorganizes the code into a more accessible package structure.
+
+### Original Repository Features:
+- Fundus image contrast enhancement algorithms
 - GPU-accelerated preprocessing with mixed precision
 - Ensemble model inference for segmentation, classification, and regression tasks
 - Sliding window inference for large medical images
 
-This rewrite focuses on:
-- Making the code more accessible as a pip-installable package
-- Improving code organization and documentation
-- Adding comprehensive testing infrastructure
-- Providing Docker-based testing environments
-- Simplifying the API for easier integration
+### This Rewrite:
+- Reorganized code as a pip-installable package
+- Simplified API and improved documentation
+- Added packaging infrastructure (pyproject.toml, setup.py)
+- Removed testing infrastructure for simplicity
+
+**All credit for the algorithms and models goes to the original authors of [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models).**
+
+---
 
 ## AI-Assisted Development
 
-This project was developed with assistance from AI tools, including:
-- **GitHub Copilot/Claude**: Code completion and suggestions
-- **ChatGPT/Claude**: Documentation, testing strategy, and package structure
+**This rewrite was developed with EXTENSIVE assistance from AI tools:**
 
-AI assistance was primarily used for:
-- Package structure and build configuration (pyproject.toml, setup.py)
-- Test suite development and pytest configuration
+- **GitHub Copilot**: Code completion, refactoring suggestions
+- **ChatGPT / Claude**: Architecture planning, documentation, packaging setup
+
+AI assistance was used for:
+- Package structure and build configuration (pyproject.toml, setup.py, MANIFEST.in)
+- Code reorganization from original repository
+- Documentation writing (README.md, docstrings, comments)
 - Docker containerization and docker-compose setup
-- Documentation writing (README, guides, examples)
-- CI/CD pipeline configuration (GitHub Actions)
+- Build scripts (Makefile, build.ps1)
+- CI/CD configuration
 - Code formatting and linting setup
 
-The core algorithms, preprocessing logic, and model inference code are based on the original work referenced above.
+**The core algorithms, preprocessing logic, and model inference code are from the original work by Eyened.**
 
 ## Dependencies
 
