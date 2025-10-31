@@ -985,7 +985,7 @@ class FundusContrastEnhance:
         undone_image = K.warp_affine(
             bounded_fp,
             M_torch,
-            hw[::-1],
+            hw,
             mode='nearest',
             padding_mode='zeros',
             align_corners=False
@@ -998,8 +998,7 @@ class FundusContrastEnhance:
         self, 
         points_tensor: torch.Tensor, 
         center: Tuple[float, float], 
-        radius: float, 
-        hw: Tuple[int, int], 
+        radius: float,
         **kwargs
     ) -> torch.Tensor:
         """Reverses a specific center-radius crop-and-scale operation for points.

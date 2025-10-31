@@ -39,6 +39,9 @@ def main():
     # Get class predictions
     pred_classes = prediction[0].cpu().numpy()  # [H, W]
     
+    # Resize prediction to match original image size if needed
+    rgb_array = np.array(rgb_image)
+    
     # Create colored segmentation mask
     segmentation_mask = np.zeros((*pred_classes.shape, 3), dtype=np.uint8)
     segmentation_mask[pred_classes == 1] = [255, 0, 0]    # Arteries in red
@@ -59,8 +62,7 @@ def main():
     axes[1].axis('off')
     
     # Overlay
-    rgb_array = np.array(rgb_image)
-    overlay = rgb_array.copy()
+    overlay = rgb_array.copy().astype(float)
     alpha = 0.5
     overlay[pred_classes == 1] = (1 - alpha) * overlay[pred_classes == 1] + alpha * np.array([255, 0, 0])
     overlay[pred_classes == 2] = (1 - alpha) * overlay[pred_classes == 2] + alpha * np.array([0, 0, 255])

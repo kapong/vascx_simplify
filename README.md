@@ -59,6 +59,8 @@ rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
 
+![Artery/Vein Segmentation Result](examples/artery_vein_segmentation_result.png)
+
 ### Optic Disc Segmentation
 
 Detect and segment the optic disc:
@@ -73,6 +75,8 @@ model = EnsembleSegmentation(model_path, VASCXTransform(512))
 rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
+
+![Optic Disc Segmentation Result](examples/disc_segmentation_result.png)
 
 ### Fovea Detection
 
@@ -92,6 +96,8 @@ fovea_x = prediction[0, 0, 0].item()
 fovea_y = prediction[0, 0, 1].item()
 ```
 
+![Fovea Detection Result](examples/fovea_detection_result.png)
+
 ### Image Quality Assessment
 
 Classify fundus image quality (Reject/Usable/Good):
@@ -109,6 +115,8 @@ prediction = model.predict(rgb_image)  # Returns [B, 3] with quality scores (alr
 # Get probabilities (already normalized)
 q1_reject, q2_usable, q3_good = prediction[0].tolist()
 ```
+
+![Image Quality Classification Result](examples/quality_classification_result.png)
 
 ## License
 
