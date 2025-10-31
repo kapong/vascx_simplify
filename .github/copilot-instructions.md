@@ -140,6 +140,78 @@ tests/                   # Unit tests (if needed)
 
 ### 6. Git Workflow
 
+#### Planning and Branching Strategy
+When planning new features or significant changes:
+
+```bash
+# 1. Create a new branch for the plan
+git checkout -b plan/feature-name
+
+# 2. Create a plan document in docs/
+# Format: docs/PLANXX_<descriptive_name>.md
+# Example: docs/PLAN03_MIXED_PRECISION.md
+
+# 3. Document the plan with:
+# - Goals and motivation
+# - Technical approach
+# - Implementation steps
+# - Success criteria
+# - Testing strategy
+
+# 4. Commit the plan
+git add docs/PLAN03_*.md
+git commit -m "docs: add plan for mixed precision optimization"
+
+# 5. Implement the plan in the same branch
+# ... make changes ...
+git commit -m "feat: implement mixed precision in preprocessing"
+
+# 6. Run code quality checks (REQUIRED before merge)
+# Lint and fix code quality issues
+black src/ examples/  # Format code
+isort src/ examples/  # Sort imports
+# Fix any linting errors
+git add .
+git commit -m "chore: lint and format code"
+
+# 7. Manual testing (REQUIRED)
+# Run all examples and verify outputs
+python examples/01_artery_vein.py
+python examples/02_disc_segment.py
+# ... test all relevant examples ...
+
+# 8. Merge back to main when manual testing is complete
+git checkout main
+git merge plan/feature-name
+```
+
+**Plan Document Template:**
+```markdown
+# PLANXX: Feature Name
+
+## Goals
+- Clear objectives
+- Expected outcomes
+
+## Motivation
+Why this change is needed
+
+## Technical Approach
+High-level design decisions
+
+## Implementation Steps
+1. Step 1
+2. Step 2
+...
+
+## Success Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+
+## Testing Strategy
+How to verify the implementation
+```
+
 #### Commit Strategy
 ```bash
 # Commit after EACH logical task completion
@@ -178,6 +250,21 @@ python -m pytest tests/  # If tests exist
 git diff HEAD~1
 git log --oneline -5  # Check commit history
 ```
+
+#### Version Management
+When ready to create a new release version:
+
+```bash
+# Use the appropriate command based on the type of changes
+/commit_major_version    # For breaking changes (X.0.0)
+/commit_minor_version    # For new features (0.X.0)
+/commit_patch_version    # For bug fixes (0.0.X)
+```
+
+**Version Guidelines:**
+- **Major version**: Breaking API changes, major refactors
+- **Minor version**: New features, backward-compatible changes
+- **Patch version**: Bug fixes, documentation updates, small improvements
 
 ## Code Style
 

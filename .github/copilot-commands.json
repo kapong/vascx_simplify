@@ -1,0 +1,44 @@
+{
+  "commands": [
+    {
+      "name": "commit_major_version",
+      "description": "Create a new major version release (X.0.0) for breaking changes",
+      "prompt": "Create a new major version release:\n1. Read the current version from pyproject.toml\n2. Increment the major version (X.0.0, reset minor and patch to 0)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to X.0.0'\n6. Create a git tag: vX.0.0\n7. Show the new version and next steps (push commits and tags)"
+    },
+    {
+      "name": "commit_minor_version",
+      "description": "Create a new minor version release (0.X.0) for new features",
+      "prompt": "Create a new minor version release:\n1. Read the current version from pyproject.toml\n2. Increment the minor version (0.X.0, reset patch to 0)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to 0.X.0'\n6. Create a git tag: v0.X.0\n7. Show the new version and next steps (push commits and tags)"
+    },
+    {
+      "name": "commit_patch_version",
+      "description": "Create a new patch version release (0.0.X) for bug fixes",
+      "prompt": "Create a new patch version release:\n1. Read the current version from pyproject.toml\n2. Increment the patch version (0.0.X)\n3. Update the version in pyproject.toml\n4. Update the version in setup.py if it exists\n5. Create a git commit with message: 'chore: bump version to 0.0.X'\n6. Create a git tag: v0.0.X\n7. Show the new version and next steps (push commits and tags)"
+    },
+    {
+      "name": "create_plan",
+      "description": "Create a new plan document and branch for a feature or change",
+      "prompt": "Create a new plan for a feature:\n1. Ask the user for a brief feature name (e.g., 'mixed-precision', 'batch-processing')\n2. Find the highest existing PLANXX number in docs/ directory\n3. Create a new branch: plan/<feature-name>\n4. Create docs/PLAN<XX+1>_<FEATURE_NAME>.md with the template:\n   - Goals\n   - Motivation\n   - Technical Approach\n   - Implementation Steps\n   - Success Criteria\n   - Testing Strategy\n5. Commit the plan document\n6. Show the user what to do next"
+    },
+    {
+      "name": "lint_and_format",
+      "description": "Run code quality checks and auto-fix formatting issues",
+      "prompt": "Run code quality checks:\n1. Run black on src/ and examples/ directories\n2. Run isort on src/ and examples/ directories\n3. Show a summary of what was changed\n4. If changes were made, create a commit with message: 'chore: lint and format code'\n5. Remind the user to run manual tests before merging"
+    },
+    {
+      "name": "run_examples",
+      "description": "Run all example scripts to verify functionality",
+      "prompt": "Run all example scripts:\n1. List all Python files in examples/ directory\n2. Run each example script sequentially\n3. Report success/failure for each\n4. If any fail, show the error details\n5. Summarize the results"
+    },
+    {
+      "name": "check_performance",
+      "description": "Check for common performance issues in the code",
+      "prompt": "Check for common performance anti-patterns:\n1. Search for .cpu() followed by .cuda() patterns (unnecessary transfers)\n2. Search for .numpy() conversions in hot paths\n3. Search for loops that could be batched\n4. Search for missing .to(device) or .cuda() optimizations\n5. Check for float32 usage where float16 could be used\n6. Report findings with file locations and suggestions"
+    },
+    {
+      "name": "verify_output_consistency",
+      "description": "Verify that recent changes didn't alter numerical outputs",
+      "prompt": "Verify output consistency:\n1. Ask which example to test (or test all)\n2. Run the example(s) and capture outputs\n3. Remind the user to compare with baseline if they have one\n4. Check for deterministic behavior (run twice, compare outputs)\n5. Report any inconsistencies or confirm consistency"
+    }
+  ]
+}
