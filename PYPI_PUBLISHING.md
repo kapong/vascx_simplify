@@ -30,7 +30,7 @@ GitHub Actions uses OpenID Connect (OIDC) for secure authentication with PyPI, e
 2. Scroll to "Publishing" section
 3. Click "Add a new pending publisher"
 4. Fill in:
-   - **PyPI Project Name**: `vascx-simplify` (or your package name)
+   - **PyPI Project Name**: `vascx_simplify` (or your package name)
    - **Owner**: Your GitHub username/organization
    - **Repository name**: Your repository name
    - **Workflow name**: `build-and-publish.yml`

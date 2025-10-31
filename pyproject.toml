@@ -12,11 +12,17 @@ license = {text = "MIT"}
 authors = [
     {name = "Phongphan Phienphanich", email = "garpong@gmail.com"},
 ]
-keywords = ["pytorch", "medical-imaging", "fundus", "vessel-analysis", "computer-vision"]
+keywords = [
+    "pytorch",
+    "medical-imaging",
+    "fundus",
+    "vessel-analysis",
+    "computer-vision",
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -27,34 +33,34 @@ classifiers = [
 ]
 
 dependencies = [
-    "torch>=1.10.0",
+    "huggingface-hub>=0.10.0",
     "kornia>=0.6.0",
+    "numpy>=1.21.0",
     "scikit-learn>=1.0.0",
     "scipy>=1.7.0",
-    "numpy>=1.21.0",
-    "huggingface-hub>=0.10.0",
+    "torch>=1.10.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
     "black>=22.0.0",
     "flake8>=5.0.0",
-    "mypy>=0.990",
     "isort>=5.10.0",
+    "mypy>=0.990",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
 ]
 
 test = [
+    "pillow>=9.0.0",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
-    "pillow>=9.0.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/kapong/vascx_simplify"
-Documentation = "https://github.com/kapong/vascx_simplify#readme"
 Repository = "https://github.com/kapong/vascx_simplify.git"
+Documentation = "https://github.com/kapong/vascx_simplify#readme"
 "Bug Tracker" = "https://github.com/kapong/vascx_simplify/issues"
 "Original Work" = "https://github.com/Eyened/rtnls_vascx_models"
 
@@ -81,7 +87,7 @@ addopts = [
 
 [tool.black]
 line-length = 100
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ["py312", "py313"]
 include = '\.pyi?$'
 exclude = '''
 /(
@@ -100,7 +106,7 @@ line_length = 100
 skip_gitignore = true
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
