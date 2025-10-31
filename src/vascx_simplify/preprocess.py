@@ -109,6 +109,86 @@ class FundusContrastEnhance:
                 self._compute_dtype_cache[device] = torch.float32
         return self._compute_dtype_cache[device]
     
+    def _invert_affine_matrix(self, M: torch.Tensor, device: torch.device) -> torch.Tensor:
+        """Convert 2x3 affine matrix to 3x3 and invert (float32 for precision).
+        
+        Args:
+            M: 2x3 affine transformation matrix
+            device: Target device
+            
+        Returns:
+            3x3 inverted matrix (float32)
+        """
+        M_fp32 = M.float()  # Convert to float32 for accurate inverse
+        M_3x3 = torch.cat([M_fp32, torch.tensor([[0., 0., 1.]], device=device, dtype=torch.float32)], dim=0)
+        return torch.inverse(M_3x3)
+    
+    def _transform_point_to_original(
+        self, 
+        point: Tuple[float, float], 
+        M_inv: torch.Tensor, 
+        device: torch.device
+    ) -> np.ndarray:
+        """Transform a point from normalized space back to original coordinates.
+        
+        Args:
+            point: (x, y) coordinates in normalized space
+            M_inv: 3x3 inverse transformation matrix (float32)
+            device: Target device
+            
+        Returns:
+            (x, y) coordinates in original space as numpy array
+        """
+        point_homo = torch.tensor([point[0], point[1], 1.], device=device, dtype=torch.float32)
+        point_orig_homo = M_inv @ point_homo
+        return (point_orig_homo[:2] / point_orig_homo[2]).cpu().numpy()
+    
+    def _get_or_create_grid(
+        self,
+        h: int,
+        w: int,
+        device: torch.device,
+        dtype: torch.dtype
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Get or create cached coordinate grids for given dimensions.
+        
+        Args:
+            h: Grid height
+            w: Grid width
+            device: Target device
+            dtype: Data type for grid
+            
+        Returns:
+            Tuple of (x_grid, y_grid) coordinate meshgrids
+        """
+        cache_key = (h, w, device, dtype)
+        if cache_key not in self._grid_cache:
+            self._grid_cache[cache_key] = self._create_coordinate_grid(h, w, device, dtype)
+        return self._grid_cache[cache_key]
+    
+    def _create_coordinate_grid(
+        self,
+        h: int,
+        w: int,
+        device: torch.device,
+        dtype: torch.dtype
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Create coordinate grids for given dimensions.
+        
+        Args:
+            h: Grid height
+            w: Grid width
+            device: Target device
+            dtype: Data type for grid
+            
+        Returns:
+            Tuple of (x_grid, y_grid) coordinate meshgrids
+        """
+        y_coords = torch.arange(h, device=device, dtype=dtype)
+        x_coords = torch.arange(w, device=device, dtype=dtype)
+        y_grid, x_grid = torch.meshgrid(y_coords, x_coords, indexing='ij')
+        return (x_grid, y_grid)
+    
     def __call__(self, img: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """
         Args:
@@ -184,22 +264,13 @@ class FundusContrastEnhance:
         lines = {} if circle_fraction > 0.85 else self._fit_lines(xs, ys, radius, center, circle_fraction)
         
         # Transform back to original coordinates using GPU (use float32 for precision)
-        M_fp32 = M.float()  # Convert to float32 for accurate inverse
-        M_3x3 = torch.cat([M_fp32, torch.tensor([[0., 0., 1.]], device=device, dtype=torch.float32)], dim=0)
-        M_inv = torch.inverse(M_3x3)
-        
-        center_homo = torch.tensor([center[0], center[1], 1.], device=device, dtype=torch.float32)
-        center_orig_homo = M_inv @ center_homo
-        center_orig = (center_orig_homo[:2] / center_orig_homo[2]).cpu().numpy()
+        M_inv = self._invert_affine_matrix(M, device)
+        center_orig = self._transform_point_to_original(center, M_inv, device)
         
         lines_orig = {}
         for k, (p0, p1) in lines.items():
-            p0_homo = torch.tensor([p0[0], p0[1], 1.], device=device, dtype=torch.float32)
-            p1_homo = torch.tensor([p1[0], p1[1], 1.], device=device, dtype=torch.float32)
-            p0_orig_homo = M_inv @ p0_homo
-            p1_orig_homo = M_inv @ p1_homo
-            p0_orig = (p0_orig_homo[:2] / p0_orig_homo[2]).cpu().numpy()
-            p1_orig = (p1_orig_homo[:2] / p1_orig_homo[2]).cpu().numpy()
+            p0_orig = self._transform_point_to_original(p0, M_inv, device)
+            p1_orig = self._transform_point_to_original(p1, M_inv, device)
             lines_orig[k] = (p0_orig, p1_orig)
         
         return {
@@ -461,11 +532,9 @@ class FundusContrastEnhance:
         
         # Upsample blur back to original size (keep in compute dtype)
         h, w = bounds['hw']
-        # Convert M_ce to float32 for accurate inverse, then back to compute_dtype
-        M_ce_fp32 = M_ce.float()
-        M_ce_3x3 = torch.cat([M_ce_fp32, torch.tensor([[0., 0., 1.]], device=device, dtype=torch.float32)], dim=0)
-        M_ce_inv_fp32 = torch.inverse(M_ce_3x3)[:2]
-        M_ce_inv = M_ce_inv_fp32.to(compute_dtype)  # Convert back for warp_affine
+        # Use helper to invert matrix (returns 3x3 float32)
+        M_ce_inv_3x3 = self._invert_affine_matrix(M_ce, device)
+        M_ce_inv = M_ce_inv_3x3[:2].to(compute_dtype)  # Extract 2x3 and convert back for warp_affine
         
         blurred = K.warp_affine(
             blurred_small,
@@ -551,14 +620,7 @@ class FundusContrastEnhance:
                 mirrored[:, :, max_x:] = torch.flip(mirrored[:, :, max_x-flip_w:max_x], dims=[2])[:, :, :w-max_x]
         
         # Mirror circle using cached grid coordinates (GPU, use compute dtype)
-        grid_key = (h, w, device, compute_dtype)
-        if grid_key not in self._grid_cache:
-            y_coords = torch.arange(h, device=device, dtype=compute_dtype)
-            x_coords = torch.arange(w, device=device, dtype=compute_dtype)
-            y_grid, x_grid = torch.meshgrid(y_coords, x_coords, indexing='ij')
-            self._grid_cache[grid_key] = (x_grid, y_grid)
-        else:
-            x_grid, y_grid = self._grid_cache[grid_key]
+        x_grid, y_grid = self._get_or_create_grid(h, w, device, compute_dtype)
         
         r_sq_norm = ((x_grid - cx) / (self.CIRCLE_SCALE_FACTOR * radius))**2 + ((y_grid - cy) / (self.CIRCLE_SCALE_FACTOR * radius))**2
         outside = r_sq_norm > 1
@@ -587,14 +649,7 @@ class FundusContrastEnhance:
         d = int(self.BORDER_MARGIN_FRACTION * radius)
         
         # Get or create cached grid (use compute dtype)
-        grid_key = (h, w, device, compute_dtype)
-        if grid_key not in self._grid_cache:
-            y_coords = torch.arange(h, device=device, dtype=compute_dtype)
-            x_coords = torch.arange(w, device=device, dtype=compute_dtype)
-            y_grid, x_grid = torch.meshgrid(y_coords, x_coords, indexing='ij')
-            self._grid_cache[grid_key] = (x_grid, y_grid)
-        else:
-            x_grid, y_grid = self._grid_cache[grid_key]
+        x_grid, y_grid = self._get_or_create_grid(h, w, device, compute_dtype)
         
         r_norm = torch.sqrt(((x_grid - cx) / (self.CIRCLE_SCALE_FACTOR * radius))**2 + ((y_grid - cy) / (self.CIRCLE_SCALE_FACTOR * radius))**2)
         mask = r_norm < 1

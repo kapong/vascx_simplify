@@ -53,17 +53,11 @@ def sliding_window_inference(
         if isinstance(first_pred, tuple):
             first_pred = torch.stack(first_pred, dim=1)
     
-    # Initialize output
-    if first_pred.dim() == 5:  # (B, M, C, H, W)
-        _, n_models, n_classes, _, _ = first_pred.shape
-        output = torch.zeros((batch_size, n_models, n_classes, height, width), 
-                            device=inputs.device, dtype=inputs.dtype)
-        importance_map_exp = importance_map[None, None, None, :, :]
-    else:  # (B, C, H, W)
-        _, n_classes, _, _ = first_pred.shape
-        output = torch.zeros((batch_size, n_classes, height, width), 
-                            device=inputs.device, dtype=inputs.dtype)
-        importance_map_exp = importance_map[None, None, :, :]
+    # Initialize output using helper
+    output, importance_map_exp = _initialize_output_tensor(
+        first_pred, batch_size, height, width, importance_map,
+        inputs.device, inputs.dtype
+    )
     
     count_map = torch.zeros((batch_size, height, width), device=inputs.device, dtype=inputs.dtype)
     
@@ -118,6 +112,42 @@ def _create_gaussian_importance_map(height: int, width: int, device: torch.devic
     )
     
     return gaussian
+
+def _initialize_output_tensor(
+    first_pred: torch.Tensor,
+    batch_size: int,
+    height: int,
+    width: int,
+    importance_map: torch.Tensor,
+    device: torch.device,
+    dtype: torch.dtype
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Initialize output tensor with correct shape based on prediction dimensions.
+    
+    Args:
+        first_pred: First prediction to determine output shape
+        batch_size: Number of images in batch
+        height: Output height
+        width: Output width
+        importance_map: Importance map for weighting
+        device: Target device
+        dtype: Data type
+        
+    Returns:
+        Tuple of (output tensor, expanded importance map)
+    """
+    if first_pred.dim() == 5:  # (B, M, C, H, W)
+        _, n_models, n_classes, _, _ = first_pred.shape
+        output = torch.zeros((batch_size, n_models, n_classes, height, width), 
+                            device=device, dtype=dtype)
+        importance_map_exp = importance_map[None, None, None, :, :]
+    else:  # (B, C, H, W)
+        _, n_classes, _, _ = first_pred.shape
+        output = torch.zeros((batch_size, n_classes, height, width), 
+                            device=device, dtype=dtype)
+        importance_map_exp = importance_map[None, None, :, :]
+    
+    return output, importance_map_exp
 
 
 class EnsembleBase(torch.nn.Module):
