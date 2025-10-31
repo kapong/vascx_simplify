@@ -99,68 +99,78 @@
 
 ---
 
-## 🔨 Phase 3: Reduce Code Duplication (TODO)
+## ✅ Phase 3: Reduce Code Duplication (COMPLETED)
 
 ### Priority: Medium | Risk: Medium
 
-### Phase 3.1: Consolidate Ensemble Class Duplication
+### Phase 3.1: Consolidate Ensemble Class Duplication ✅
 **File:** `inference.py`
 
 **Objective:** Extract common patterns from ensemble subclasses
 
 **Refactorings:**
-- [ ] Extract `_prepare_input()` in `EnsembleBase`
+- [x] Extract `_prepare_input()` in `EnsembleBase`
   ```python
   def _prepare_input(self, img: torch.Tensor) -> Tuple[torch.Tensor, Optional[Dict[str, Any]]]:
       """Common input preparation logic."""
       img, bounds = self.transforms(img)
       return img.to(self.device).unsqueeze(dim=0), bounds
   ```
-- [ ] Extract `_run_inference()` wrapper in `EnsembleBase`
-- [ ] Simplify `predict()` methods in subclasses to use base helpers
-- [ ] Test: Run all 4 examples, verify outputs identical
+- [x] Extract `_run_inference()` wrapper in `EnsembleBase`
+- [x] Simplify `predict()` methods in subclasses to use base helpers
+- [x] Test: Run all 4 examples, verify outputs identical
 
-**Expected Impact:**
-- Reduce ~15-20 lines of duplicated code
+**Impact:**
+- Reduced ~15-20 lines of duplicated code
 - Clearer separation of concerns in ensemble classes
 
-### Phase 3.2: Consolidate Edge Mirroring Logic
+### Phase 3.2: Consolidate Edge Mirroring Logic ✅
 **File:** `preprocess.py`
 
 **Objective:** Reduce duplication in `_mirror_image()`
 
 **Refactorings:**
-- [ ] Extract `_mirror_edge()` helper method
+- [x] Extract `_mirror_edge()` helper method
   ```python
   def _mirror_edge(
       self, mirrored: torch.Tensor, bound_val: int, 
-      is_2d: bool, dim_2d: int, dim_3d: int, direction: str
+      size: int, content_min: int, content_max: int,
+      is_top_or_left: bool, is_2d: bool, dim_2d: int, dim_3d: int
   ) -> None:
       """Mirror a single edge (top/bottom/left/right)."""
       # Unified logic for all edges
   ```
-- [ ] Parameterize edge mirroring with configuration
-- [ ] Replace 4 if-blocks with loop over edge configs
-- [ ] Test: Verify mirroring outputs unchanged
+- [x] Parameterize edge mirroring with configuration
+- [x] Replace 4 if-blocks with 4 calls to helper method
+- [x] Test: Verify mirroring outputs unchanged
 
-**Expected Impact:**
-- Reduce ~40 lines of duplicated code
+**Impact:**
+- Reduced ~40 lines of duplicated code
 - Easier to maintain edge mirroring logic
 
-### Phase 3.3: Extract Line Fitting Logic
+### Phase 3.3: Extract Line Fitting Logic ✅
 **File:** `preprocess.py`
 
 **Objective:** Simplify `_fit_lines()` method
 
 **Refactorings:**
-- [ ] Extract `_fit_line_ransac()` helper for single line fitting
-- [ ] Extract horizontal vs vertical line logic into helper
-- [ ] Reduce duplication in left/right and top/bottom fitting
-- [ ] Test: Verify line detection unchanged
+- [x] Extract `_fit_line_ransac()` helper for single line fitting
+- [x] Extract horizontal vs vertical line logic into helper
+- [x] Reduce duplication in left/right and top/bottom fitting
+- [x] Test: Verify line detection unchanged
 
-**Expected Impact:**
-- Reduce ~15 lines of duplicated code
+**Impact:**
+- Reduced ~15 lines of duplicated code
 - Clearer line fitting logic
+
+### Phase 3 Verification ✅
+- [x] All helper methods work correctly
+- [x] Edge mirroring outputs unchanged
+- [x] Line fitting outputs unchanged
+- [x] Ensemble class predict() methods work correctly
+- [x] No functional changes
+
+**Status:** ✅ COMPLETE - 1 commit, 100% backward compatible, ~70 lines of duplication removed
 
 ---
 
