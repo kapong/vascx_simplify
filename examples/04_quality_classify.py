@@ -9,23 +9,18 @@ The model outputs predictions with 3 quality classes aligned with EyeQ scores:
 - q2: "Usable" - Acceptable quality, can be used with caution
 - q3: "Good" - High quality, suitable for diagnosis
 
-The output scores can be softmaxed and sum to 1.0 for probability interpretation.
+The output scores are already softmaxed and sum to 1.0 for probability interpretation.
 """
 
 from vascx_simplify import ClassificationEnsemble, VASCXTransform, from_huggingface
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
-import torch.nn.functional as F
 
 
 def main():
     # Configuration
     IMG_PATH = 'HRF_07_dr.jpg'  # Path to your fundus image
-    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    print(f"Using device: {DEVICE}")
     
     # Step 1: Download and load the quality classification model
     print("Loading quality classification model...")
@@ -33,8 +28,7 @@ def main():
     
     # Step 2: Initialize preprocessing transform and model
     # Note: have_ce=False means no contrast enhancement for quality assessment
-    transform = VASCXTransform(size=1024, have_ce=False, device=DEVICE)
-    model = ClassificationEnsemble(model_path, transform, device=DEVICE)
+    model = ClassificationEnsemble(model_path, VASCXTransform(have_ce=False))
     
     # Step 3: Load and process the image
     print(f"Loading image: {IMG_PATH}")
@@ -42,46 +36,27 @@ def main():
     
     # Step 4: Run prediction
     print("Running quality assessment...")
-    prediction = model.predict(rgb_image)  # Returns tensor [B, M, 3] where M=models, 3=classes
+    prediction = model.predict(rgb_image)  # Returns tensor [B, 3] with quality scores (already softmaxed)
     
     # Step 5: Process predictions
-    # Get scores from first image, first model
-    raw_scores = prediction[0, 0, :].cpu()  # [3] - raw scores for q1, q2, q3
-    
-    # Apply softmax to convert to probabilities
-    probabilities = F.softmax(raw_scores, dim=0).numpy()
+    # Get probabilities (already normalized)
+    probabilities = prediction[0].cpu().numpy()  # [3] - probabilities for q1, q2, q3
     
     quality_labels = ['Reject (q1)', 'Usable (q2)', 'Good (q3)']
     
     print("\nQuality Assessment Results:")
     print("-" * 40)
-    print(f"Raw Scores:")
-    for i, label in enumerate(quality_labels):
-        print(f"  {label}: {raw_scores[i].item():.4f}")
-    
-    print(f"\nProbabilities (after softmax):")
+    print(f"Probabilities:")
     for i, label in enumerate(quality_labels):
         print(f"  {label}: {probabilities[i]:.2%}")
     
     # Determine final quality rating
-    predicted_class = torch.argmax(raw_scores).item()
+    predicted_class = np.argmax(probabilities)
     quality_rating = ['REJECT', 'USABLE', 'GOOD'][predicted_class]
     quality_color = ['red', 'orange', 'green'][predicted_class]
     
     print(f"\nFinal Quality Rating: {quality_rating}")
     print(f"Confidence: {probabilities[predicted_class]:.2%}")
-    
-    # If there are multiple models in the ensemble, show statistics
-    num_models = prediction.shape[1]
-    if num_models > 1:
-        all_predictions = prediction[0, :, :].cpu()
-        all_probs = F.softmax(all_predictions, dim=1).numpy()
-        mean_probs = all_probs.mean(axis=0)
-        std_probs = all_probs.std(axis=0)
-        
-        print(f"\nEnsemble Statistics ({num_models} models):")
-        for i, label in enumerate(quality_labels):
-            print(f"  {label}: {mean_probs[i]:.2%} ± {std_probs[i]:.2%}")
     
     # Step 6: Visualize results
     fig = plt.figure(figsize=(14, 6))

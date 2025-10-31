@@ -99,17 +99,15 @@ Classify fundus image quality (Reject/Usable/Good):
 ```python
 from vascx_simplify import ClassificationEnsemble, VASCXTransform, from_huggingface
 from PIL import Image
-import torch.nn.functional as F
 
 model_path = from_huggingface('Eyened/vascx:quality/quality.pt')
 model = ClassificationEnsemble(model_path, VASCXTransform(have_ce=False))
 
 rgb_image = Image.open('fundus.jpg')
-prediction = model.predict(rgb_image)  # Returns [B, M, 3] with quality scores
+prediction = model.predict(rgb_image)  # Returns [B, 3] with quality scores (already softmaxed)
 
-# Convert to probabilities
-probs = F.softmax(prediction[0, 0, :], dim=0)
-q1_reject, q2_usable, q3_good = probs.tolist()
+# Get probabilities (already normalized)
+q1_reject, q2_usable, q3_good = prediction[0].tolist()
 ```
 
 ## License

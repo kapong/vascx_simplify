@@ -11,23 +11,18 @@ from vascx_simplify import HeatmapRegressionEnsemble, VASCXTransform, from_huggi
 from PIL import Image
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 
 
 def main():
     # Configuration
     IMG_PATH = 'HRF_07_dr.jpg'  # Path to your fundus image
-    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    print(f"Using device: {DEVICE}")
     
     # Step 1: Download and load the fovea detection model
     print("Loading fovea detection model...")
     model_path = from_huggingface('Eyened/vascx:fovea/fovea_july24.pt')
     
     # Step 2: Initialize preprocessing transform and model
-    transform = VASCXTransform(size=1024, have_ce=True, device=DEVICE)
-    model = HeatmapRegressionEnsemble(model_path, transform, device=DEVICE)
+    model = HeatmapRegressionEnsemble(model_path, VASCXTransform())
     
     # Step 3: Load and process the image
     print(f"Loading image: {IMG_PATH}")
