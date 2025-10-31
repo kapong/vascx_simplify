@@ -118,6 +118,57 @@ q1_reject, q2_usable, q3_good = prediction[0].tolist()
 
 ![Image Quality Classification Result](examples/quality_classification_result.png)
 
+### Batch Processing
+
+Process multiple images efficiently with automatic batch splitting to prevent out-of-memory errors:
+
+```python
+from vascx_simplify import EnsembleSegmentation, VASCXTransform, from_huggingface
+from PIL import Image
+
+# Load model once
+model_path = from_huggingface('Eyened/vascx:artery_vein/av_july24.pt')
+model = EnsembleSegmentation(model_path, VASCXTransform())
+
+# Load multiple images
+images = [Image.open(f'fundus_{i}.jpg') for i in range(10)]
+
+# Batch prediction (much faster than sequential processing)
+predictions = model.predict(images)  # Returns [10, H, W]
+# Automatically splits into chunks of 4 (default for segmentation)
+
+# Process each result
+for i, pred in enumerate(predictions):
+    # pred is [H, W] - no need for [0] indexing
+    save_prediction(pred, f'result_{i}.png')
+
+# For large datasets, automatic splitting prevents OOM
+large_images = [Image.open(f'img_{i}.jpg') for i in range(100)]
+predictions = model.predict(large_images)  # Auto-splits into chunks
+# Returns [100, H, W] - seamlessly handles large batches
+
+# Override batch size for your GPU memory
+predictions = model.predict(images, batch_size=8)  # Process 8 at once
+```
+
+**Performance**: Batch processing is typically 2-3x faster than processing images sequentially.
+
+**Memory Management**: Each model type has sensible default batch sizes:
+- **Segmentation**: 4 images (sliding window is memory-intensive)
+- **Classification**: 16 images (lightweight forward pass)
+- **Regression**: 16 images
+- **Heatmap**: 2 images (heatmaps are very memory-intensive)
+
+**Backward Compatibility**: All existing single-image code works without modification:
+```python
+# This still works exactly as before
+image = Image.open('fundus.jpg')
+pred = model.predict(image)  # Returns [1, H, W]
+result = pred[0]  # Access with [0] as before
+```
+
+See `examples/05_batch_processing.py` for a complete performance demonstration.
+
 ## License
 
 MIT License - see LICENSE file for details.
