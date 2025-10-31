@@ -1,14 +1,19 @@
+from typing import Tuple, Callable, Optional, Union, Dict, Any
 import json
 import torch
 from .preprocess import VASCXTransform
 
 DEFAULT_DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+# Constants for sliding window inference
+GAUSSIAN_SIGMA_FRACTION = 0.125  # MONAI's standard sigma for Gaussian importance map
+MIN_WEIGHT_THRESHOLD = 1e-8  # Minimum weight threshold to prevent division by zero
+
 def sliding_window_inference(
     inputs: torch.Tensor,
-    roi_size: tuple,
+    roi_size: Tuple[int, int],
     sw_batch_size: int,
-    predictor,
+    predictor: Callable,
     overlap: float = 0.5,
     mode: str = 'gaussian'
 ) -> torch.Tensor:
@@ -77,7 +82,6 @@ def sliding_window_inference(
                 batch_pred = torch.stack(batch_pred, dim=1)
         
         # Split and accumulate
-        num_wins = len(batch_slices)
         for j, (h_start, h_end, w_start, w_end) in enumerate(batch_slices):
             pred = batch_pred[j * batch_size:(j + 1) * batch_size]
             
@@ -86,9 +90,9 @@ def sliding_window_inference(
     
     # Normalize
     if output.dim() == 5:
-        output = output / count_map[:, None, None, :, :].clamp(min=1e-8)
+        output = output / count_map[:, None, None, :, :].clamp(min=MIN_WEIGHT_THRESHOLD)
     else:
-        output = output / count_map[:, None, :, :].clamp(min=1e-8)
+        output = output / count_map[:, None, :, :].clamp(min=MIN_WEIGHT_THRESHOLD)
     
     return output
 
@@ -100,8 +104,8 @@ def _create_gaussian_importance_map(height: int, width: int, device: torch.devic
     # MONAI's exact formula
     center_h = (height - 1) / 2.0
     center_w = (width - 1) / 2.0
-    sigma_h = height * 0.125
-    sigma_w = width * 0.125
+    sigma_h = height * GAUSSIAN_SIGMA_FRACTION
+    sigma_w = width * GAUSSIAN_SIGMA_FRACTION
     
     y = torch.arange(height, device=device, dtype=dtype)
     x = torch.arange(width, device=device, dtype=dtype)
@@ -117,32 +121,45 @@ def _create_gaussian_importance_map(height: int, width: int, device: torch.devic
 
 
 class EnsembleBase(torch.nn.Module):
-    def __init__(self, fpath: str, transforms: VASCXTransform, device: torch.device | str = DEFAULT_DEVICE):
+    def __init__(
+        self, 
+        fpath: str, 
+        transforms: VASCXTransform, 
+        device: Union[torch.device, str] = DEFAULT_DEVICE
+    ):
         super().__init__()
         self.device = device
         self.transforms = transforms
-        self.config = {"inference": {}}
+        self.config: Dict[str, Any] = {"inference": {}}
         self.load_torchscript(fpath)
 
-        self.tta = self.config["inference"].get("tta", False)
-        self.inference_config = self.config["inference"]
+        self.tta: bool = self.config["inference"].get("tta", False)
+        self.inference_config: Dict[str, Any] = self.config["inference"]
 
         self.inference_fn = self.tta_inference if self.tta else self.sliding_window_inference
 
-        self.sw_batch_size = 16
+        self.sw_batch_size: int = 16
 
-    def load_torchscript(self, fpath: str):
+    def load_torchscript(self, fpath: str) -> None:
+        extra_files = {"config.yaml": ""}
         extra_files = {"config.yaml": ""} 
         self.ensemble = torch.jit.load(fpath, _extra_files=extra_files).eval()
         self.ensemble.to(self.device)
         self.config = json.loads(extra_files["config.yaml"])
         
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         x = self.ensemble(x)
         x = torch.unbind(x, dim=0)
         return x
 
-    def sliding_window_inference(self, img, tracing_input_size=[512, 512], overlap=0.5, blend='gaussian', **kwargs):
+    def sliding_window_inference(
+        self, 
+        img: torch.Tensor, 
+        tracing_input_size: Tuple[int, int] = (512, 512), 
+        overlap: float = 0.5, 
+        blend: str = 'gaussian', 
+        **kwargs
+    ) -> torch.Tensor:
         with torch.no_grad():
             pred = sliding_window_inference(
                 inputs=img,
@@ -160,7 +177,14 @@ class EnsembleBase(torch.nn.Module):
                 pred = pred[:, None, ...]
         return pred   # Output NMCHW
 
-    def tta_inference(self, img, tta_flips=[[2], [3], [2, 3]], **kwargs):
+    def tta_inference(
+        self, 
+        img: torch.Tensor, 
+        tta_flips: list = None, 
+        **kwargs
+    ) -> torch.Tensor:
+        if tta_flips is None:
+            tta_flips = [[2], [3], [2, 3]]
         pred = self.sliding_window_inference(img, **kwargs)
         for flip_idx in tta_flips:
             flip_undo_idx = [e + 1 for e in flip_idx]  # output has extra first dim M
@@ -170,10 +194,10 @@ class EnsembleBase(torch.nn.Module):
         pred /= len(tta_flips) + 1
         return pred  # NMCHW
 
-    def proba_process(self, proba, bounds):
+    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
         return proba
     
-    def predict(self, img):
+    def predict(self, img: torch.Tensor) -> torch.Tensor:
         img, bounds = self.transforms(img)
         img = img.to(self.device).unsqueeze(dim=0)
         proba = self.inference_fn(img, **self.inference_config)
@@ -183,11 +207,16 @@ class EnsembleBase(torch.nn.Module):
 
 
 class EnsembleSegmentation(EnsembleBase):
-    def __init__(self, fpath: str, transforms: VASCXTransform, device: torch.device | str = DEFAULT_DEVICE):
+    def __init__(
+        self, 
+        fpath: str, 
+        transforms: VASCXTransform, 
+        device: Union[torch.device, str] = DEFAULT_DEVICE
+    ):
         super().__init__(fpath, transforms, device)
         self.sw_batch_size = 16
     
-    def proba_process(self, proba, bounds):
+    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
         proba = torch.mean(proba, dim=1)  # average over models (M)
         proba = torch.nn.functional.softmax(proba, dim=1)
         proba = self.transforms.undo_bounds(proba, bounds)
@@ -196,19 +225,24 @@ class EnsembleSegmentation(EnsembleBase):
 
 
 class ClassificationEnsemble(EnsembleBase):
-    def __init__(self, fpath: str, transforms: VASCXTransform, device: torch.device | str = DEFAULT_DEVICE):
+    def __init__(
+        self, 
+        fpath: str, 
+        transforms: VASCXTransform, 
+        device: Union[torch.device, str] = DEFAULT_DEVICE
+    ):
         super().__init__(fpath, transforms, device)
         self.inference_fn = None
 
-    def forward(self, img):
+    def forward(self, img: torch.Tensor) -> torch.Tensor:
         return self.ensemble(img)
 
-    def proba_process(self, proba, bounds):
+    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
         proba = torch.nn.functional.softmax(proba, dim=-1)
         proba = torch.mean(proba, dim=0)  # average over models
         return proba
         
-    def predict(self, img):
+    def predict(self, img: torch.Tensor) -> torch.Tensor:
         img, _ = self.transforms(img)
         img = img.to(self.device).unsqueeze(dim=0)
         with torch.no_grad():
@@ -219,17 +253,22 @@ class ClassificationEnsemble(EnsembleBase):
 
 
 class RegressionEnsemble(EnsembleBase):
-    def __init__(self, fpath: str, transforms: VASCXTransform, device: torch.device | str = DEFAULT_DEVICE):
+    def __init__(
+        self, 
+        fpath: str, 
+        transforms: VASCXTransform, 
+        device: Union[torch.device, str] = DEFAULT_DEVICE
+    ):
         super().__init__(fpath, transforms, device)
         self.inference_fn = None
 
-    def forward(self, img):
+    def forward(self, img: torch.Tensor) -> torch.Tensor:
         return self.ensemble(img)
 
-    def proba_process(self, proba, bounds):
+    def proba_process(self, proba: torch.Tensor, bounds: Optional[Dict[str, Any]]) -> torch.Tensor:
         return proba
         
-    def predict(self, img):
+    def predict(self, img: torch.Tensor) -> torch.Tensor:
         img, _ = self.transforms(img)
         img = img.to(self.device).unsqueeze(dim=0)
         with torch.no_grad():
@@ -240,11 +279,16 @@ class RegressionEnsemble(EnsembleBase):
 
         
 class HeatmapRegressionEnsemble(EnsembleBase):
-    def __init__(self, fpath: str, transforms: VASCXTransform, device: torch.device | str = DEFAULT_DEVICE):
+    def __init__(
+        self, 
+        fpath: str, 
+        transforms: VASCXTransform, 
+        device: Union[torch.device, str] = DEFAULT_DEVICE
+    ):
         super().__init__(fpath, transforms, device)
         self.sw_batch_size = 1
 
-    def proba_process(self, heatmaps, bounds):
+    def proba_process(self, heatmaps: torch.Tensor, bounds: Dict[str, Any]) -> torch.Tensor:
         """
         Vectorized heatmap processing - all operations on GPU with float32.
         
