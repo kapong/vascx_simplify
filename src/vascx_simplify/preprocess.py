@@ -1,3 +1,4 @@
+from typing import Tuple, Dict, Any, Optional, Union
 import torch
 import numpy as np
 from scipy.ndimage import sobel
@@ -23,12 +24,26 @@ class FundusContrastEnhance:
     - ~10-15ms → ~5-8ms total pipeline
     """
     
-    # Pre-compute constants once at class level
+    # Image processing resolution constants
     RESOLUTION = 256
     CENTER = RESOLUTION // 2
-    MAX_R = RESOLUTION // 1.8
-    MIN_R = RESOLUTION // 4
-    INLIER_DIST_THRESHOLD = RESOLUTION // 256
+    
+    # Circle detection constants
+    MAX_RADIUS_DIVISOR = 1.8  # Maximum radius = RESOLUTION / 1.8
+    MIN_RADIUS_DIVISOR = 4    # Minimum radius = RESOLUTION / 4
+    MAX_R = RESOLUTION // MAX_RADIUS_DIVISOR  # ~142 pixels
+    MIN_R = RESOLUTION // MIN_RADIUS_DIVISOR  # 64 pixels
+    INLIER_DIST_THRESHOLD = RESOLUTION // 256  # 1 pixel for 256×256
+    
+    # Circle and mask scaling constants
+    CIRCLE_SCALE_FACTOR = 0.99  # Scale factor for circle boundary
+    BORDER_MARGIN_FRACTION = 0.01  # Margin for rectangular bounds (1%)
+    CIRCLE_REFIT_SCALE = 0.95  # Scale for circle refitting
+    
+    # Enhancement constants
+    DEFAULT_SIGMA_FRACTION = 0.05  # Gaussian blur sigma as fraction of radius
+    DEFAULT_CONTRAST_FACTOR = 4  # Contrast enhancement multiplier
+    REDUCED_BLUR_RESOLUTION = 256  # Resolution for efficient blur operation
     
     # Pre-compute masks and costs (numpy for initialization only)
     r = np.arange(RESOLUTION)
@@ -48,8 +63,14 @@ class FundusContrastEnhance:
     COST_TH = np.cos(th)
     SIN_TH = np.sin(th)
     
-    def __init__(self, square_size=1024, sigma_fraction=0.05, contrast_factor=4, 
-                 return_bounds=True, use_fp16=True):
+    def __init__(
+        self, 
+        square_size: Optional[int] = 1024, 
+        sigma_fraction: Optional[float] = None, 
+        contrast_factor: Optional[int] = None, 
+        return_bounds: bool = True, 
+        use_fp16: bool = True
+    ):
         """
         Args:
             square_size: Output size (None to keep original)
@@ -58,8 +79,8 @@ class FundusContrastEnhance:
             use_fp16: Use float16 for compute-intensive ops (default True, only on CUDA)
         """
         self.square_size = square_size
-        self.sigma_fraction = sigma_fraction
-        self.contrast_factor = contrast_factor
+        self.sigma_fraction = sigma_fraction if sigma_fraction is not None else self.DEFAULT_SIGMA_FRACTION
+        self.contrast_factor = contrast_factor if contrast_factor is not None else self.DEFAULT_CONTRAST_FACTOR
         self.return_bounds = return_bounds
         self.use_fp16 = use_fp16
         
@@ -74,9 +95,9 @@ class FundusContrastEnhance:
         )
         
         # Cache for grid coordinates (avoids recreating meshgrids)
-        self._grid_cache = {}
+        self._grid_cache: Dict[Tuple, Tuple[torch.Tensor, torch.Tensor]] = {}
     
-    def _get_compute_dtype(self, device):
+    def _get_compute_dtype(self, device: torch.device) -> torch.dtype:
         """Get compute dtype based on device and user preference.
         
         FP16 only works on CUDA. CPU operations fallback to FP32.
@@ -88,7 +109,7 @@ class FundusContrastEnhance:
                 self._compute_dtype_cache[device] = torch.float32
         return self._compute_dtype_cache[device]
     
-    def __call__(self, img):
+    def __call__(self, img: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """
         Args:
             img: torch.Tensor [C, H, W] uint8
@@ -106,7 +127,11 @@ class FundusContrastEnhance:
         
         return rgb, ce_img, bounds
     
-    def _process(self, image, device):
+    def _process(
+        self, 
+        image: torch.Tensor, 
+        device: torch.device
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """Main processing pipeline - all GPU operations with mixed precision."""
         org_bounds = self._get_bounds(image, device)
         
@@ -120,7 +145,7 @@ class FundusContrastEnhance:
         
         return image, ce, org_bounds
     
-    def _get_bounds(self, image, device):
+    def _get_bounds(self, image: torch.Tensor, device: torch.device) -> Dict[str, Any]:
         """Detect fundus boundaries using GPU where possible."""
         compute_dtype = self._get_compute_dtype(device)
         
@@ -184,7 +209,11 @@ class FundusContrastEnhance:
             'hw': (h, w)
         }
     
-    def _detect_edges(self, image, device):
+    def _detect_edges(
+        self, 
+        image: torch.Tensor, 
+        device: torch.device
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Detect edge points using polar transform.
         
         Note: Uses scipy sobel on small 256×256 array (~1ms CPU overhead).
@@ -218,7 +247,13 @@ class FundusContrastEnhance:
         r = self.MAX_R * radii / self.RESOLUTION
         return self.CENTER + r * self.COST_TH, self.CENTER + r * self.SIN_TH
     
-    def _linearPolar(self, image, center, max_radius, device):
+    def _linearPolar(
+        self, 
+        image: torch.Tensor, 
+        center: Tuple[float, float], 
+        max_radius: float, 
+        device: torch.device
+    ) -> torch.Tensor:
         """Convert image to polar coordinates using GPU grid_sample."""
         compute_dtype = self._get_compute_dtype(device)
         cy, cx = center
@@ -245,7 +280,11 @@ class FundusContrastEnhance:
         
         return polar.squeeze(0).squeeze(0)  # [H, W]
     
-    def _fit_circle(self, xs, ys):
+    def _fit_circle(
+        self, 
+        xs: np.ndarray, 
+        ys: np.ndarray
+    ) -> Tuple[float, np.ndarray, float]:
         """RANSAC circle fitting.
         
         Note: Uses sklearn RANSAC on 256 points (~1ms). Too small to benefit from GPU.
@@ -293,7 +332,14 @@ class FundusContrastEnhance:
         
         return radius, center, circle_fraction
     
-    def _fit_lines(self, xs, ys, radius, center, circle_fraction):
+    def _fit_lines(
+        self, 
+        xs: np.ndarray, 
+        ys: np.ndarray, 
+        radius: float, 
+        center: np.ndarray, 
+        circle_fraction: float
+    ) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
         """Fit lines to edge regions using sklearn RANSAC."""
         if circle_fraction < 0.3:
             # Refit circle using corners
@@ -302,7 +348,7 @@ class FundusContrastEnhance:
             d = (pts**2).sum(axis=1)
             y = np.linalg.lstsq(B, d, rcond=None)[0]
             center = 0.5 * y[:2]
-            radius = 0.95 * np.sqrt(y[2] + (center**2).sum())
+            radius = self.CIRCLE_REFIT_SCALE * np.sqrt(y[2] + (center**2).sum())
         
         lines = {}
         for loc in ["left", "right"]:
@@ -325,7 +371,12 @@ class FundusContrastEnhance:
         
         return lines
     
-    def _crop_to_square(self, image, bounds, device):
+    def _crop_to_square(
+        self, 
+        image: torch.Tensor, 
+        bounds: Dict[str, Any], 
+        device: torch.device
+    ) -> torch.Tensor:
         """Crop and resize to square using kornia (GPU with mixed precision)."""
         compute_dtype = self._get_compute_dtype(device)
         cy, cx = bounds['center']
@@ -351,7 +402,7 @@ class FundusContrastEnhance:
         warped = warped.squeeze(0).float().clamp(0, 255)  # [C, H, W]
         return warped.to(torch.uint8)
     
-    def _update_bounds_after_crop(self, bounds):
+    def _update_bounds_after_crop(self, bounds: Dict[str, Any]) -> Dict[str, Any]:
         """Update bounds for cropped image."""
         return {
             'center': (self.square_size / 2, self.square_size / 2),
@@ -360,7 +411,12 @@ class FundusContrastEnhance:
             'hw': (self.square_size, self.square_size)
         }
     
-    def _enhance_contrast(self, image, bounds, device):
+    def _enhance_contrast(
+        self, 
+        image: torch.Tensor, 
+        bounds: Dict[str, Any], 
+        device: torch.device
+    ) -> torch.Tensor:
         """Apply contrast enhancement using kornia (GPU with mixed precision).
         
         Major optimization: Blur at 256×256 then upsample instead of full resolution.
@@ -370,7 +426,7 @@ class FundusContrastEnhance:
         mirrored = self._mirror_image(image, bounds, device)
         
         # Efficient blur at reduced resolution
-        ce_res = 256
+        ce_res = self.REDUCED_BLUR_RESOLUTION
         cy, cx = bounds['center']
         scale_ce = ce_res / (2 * bounds['radius'])
         # Use compute dtype for matrix (must match image for warp_affine)
@@ -435,7 +491,12 @@ class FundusContrastEnhance:
         
         return enhanced
     
-    def _mirror_image(self, image, bounds, device):
+    def _mirror_image(
+        self, 
+        image: torch.Tensor, 
+        bounds: Dict[str, Any], 
+        device: torch.device
+    ) -> torch.Tensor:
         """Mirror pixels at boundaries using torch operations (GPU).
         
         Uses uint8 directly - no need for float conversion here.
@@ -453,7 +514,7 @@ class FundusContrastEnhance:
             is_2d = False
         
         # Get rectangular bounds
-        d = int(0.01 * radius)
+        d = int(self.BORDER_MARGIN_FRACTION * radius)
         rect = self._get_rect_bounds(bounds['lines'], bounds['center'], radius, (h, w))
         min_y = max(rect['min_y'] + d, 0)
         max_y = min(rect['max_y'] - d, h)
@@ -499,7 +560,7 @@ class FundusContrastEnhance:
         else:
             x_grid, y_grid = self._grid_cache[grid_key]
         
-        r_sq_norm = ((x_grid - cx) / (0.99 * radius))**2 + ((y_grid - cy) / (0.99 * radius))**2
+        r_sq_norm = ((x_grid - cx) / (self.CIRCLE_SCALE_FACTOR * radius))**2 + ((y_grid - cy) / (self.CIRCLE_SCALE_FACTOR * radius))**2
         outside = r_sq_norm > 1
         
         scale = 1.0 / r_sq_norm[outside]
@@ -513,13 +574,17 @@ class FundusContrastEnhance:
         
         return mirrored
     
-    def _make_mask(self, bounds, device):
+    def _make_mask(
+        self, 
+        bounds: Dict[str, Any], 
+        device: torch.device
+    ) -> torch.Tensor:
         """Create binary mask using torch (GPU, use compute dtype for speed)."""
         compute_dtype = self._get_compute_dtype(device)
         cx, cy = bounds['center']
         radius = bounds['radius']
         h, w = bounds['hw']
-        d = int(0.01 * radius)
+        d = int(self.BORDER_MARGIN_FRACTION * radius)
         
         # Get or create cached grid (use compute dtype)
         grid_key = (h, w, device, compute_dtype)
@@ -531,7 +596,7 @@ class FundusContrastEnhance:
         else:
             x_grid, y_grid = self._grid_cache[grid_key]
         
-        r_norm = torch.sqrt(((x_grid - cx) / (0.99 * radius))**2 + ((y_grid - cy) / (0.99 * radius))**2)
+        r_norm = torch.sqrt(((x_grid - cx) / (self.CIRCLE_SCALE_FACTOR * radius))**2 + ((y_grid - cy) / (self.CIRCLE_SCALE_FACTOR * radius))**2)
         mask = r_norm < 1
         
         rect = self._get_rect_bounds(bounds['lines'], bounds['center'], radius, (h, w))
@@ -542,7 +607,13 @@ class FundusContrastEnhance:
         
         return mask
     
-    def _get_rect_bounds(self, lines, center, radius, hw):
+    def _get_rect_bounds(
+        self, 
+        lines: Dict[str, Tuple[np.ndarray, np.ndarray]], 
+        center: Tuple[float, float], 
+        radius: float, 
+        hw: Tuple[int, int]
+    ) -> Dict[str, int]:
         """Extract rectangular bounds from lines."""
         h, w = hw
         bounds = {'min_y': 0, 'max_y': h, 'min_x': 0, 'max_x': w}
@@ -580,7 +651,14 @@ class FundusContrastEnhance:
         
         return bounds
 
-    def undo_bounds(self, bounded_image, center, radius, hw, **kwargs):
+    def undo_bounds(
+        self, 
+        bounded_image: torch.Tensor, 
+        center: Tuple[float, float], 
+        radius: float, 
+        hw: Tuple[int, int], 
+        **kwargs
+    ) -> torch.Tensor:
         """Reverses a specific center-radius crop-and-scale operation."""
         device = bounded_image.device
         compute_dtype = self._get_compute_dtype(device)
@@ -616,7 +694,14 @@ class FundusContrastEnhance:
         # Convert back to original dtype
         return undone_image.to(bounded_image.dtype)
 
-    def undo_bounds_points(self, points_tensor, center, radius, hw, **kwargs):
+    def undo_bounds_points(
+        self, 
+        points_tensor: torch.Tensor, 
+        center: Tuple[float, float], 
+        radius: float, 
+        hw: Tuple[int, int], 
+        **kwargs
+    ) -> torch.Tensor:
         """Reverses a specific center-radius crop-and-scale operation for points.
         
         Note: Point transformation uses matrix multiplication, not grid_sample,
@@ -647,7 +732,14 @@ class FundusContrastEnhance:
         return undone_points.to(points_tensor.dtype)
     
     @staticmethod
-    def _create_affine_matrix_torch(in_size, out_size, scale, center, device, dtype=torch.float32):
+    def _create_affine_matrix_torch(
+        in_size: Tuple[int, int], 
+        out_size: int, 
+        scale: float, 
+        center: Tuple[float, float], 
+        device: torch.device, 
+        dtype: torch.dtype = torch.float32
+    ) -> torch.Tensor:
         """Create affine transformation matrix as torch tensor.
         
         Always use float32 for affine matrices to ensure precision.
@@ -660,7 +752,13 @@ class FundusContrastEnhance:
         ], dtype=dtype, device=device)
 
 class VASCXTransform:
-    def __init__(self, size: int = 1024, have_ce=True, use_fp16=True, device: torch.device | str = DEFAULT_DEVICE):
+    def __init__(
+        self, 
+        size: int = 1024, 
+        have_ce: bool = True, 
+        use_fp16: bool = True, 
+        device: Union[torch.device, str] = DEFAULT_DEVICE
+    ):
         """
         Args:
             size: Output size
@@ -696,7 +794,7 @@ class VASCXTransform:
                 device=self.device, dtype=torch.float32
             ).view(3, 1, 1)
 
-    def __call__(self, image):
+    def __call__(self, image) -> Tuple[torch.Tensor, Optional[Dict[str, Any]]]:
         """
         Args:
             image: Input image as numpy array, PIL Image, or torch.Tensor
@@ -751,10 +849,10 @@ class VASCXTransform:
             resized = (resized - self.mean) / self.std
             return resized.squeeze(0), None
 
-    def undo_bounds(self, image, bounds):
+    def undo_bounds(self, image: torch.Tensor, bounds: Dict[str, Any]) -> torch.Tensor:
         """Reverse the cropping transformation."""
         return self.contrast_enhancer.undo_bounds(image, **bounds)
         
-    def undo_bounds_points(self, points, bounds):
+    def undo_bounds_points(self, points: torch.Tensor, bounds: Dict[str, Any]) -> torch.Tensor:
         """Reverse the cropping transformation for point coordinates."""
         return self.contrast_enhancer.undo_bounds_points(points, **bounds)
