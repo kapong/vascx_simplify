@@ -225,19 +225,21 @@ class FundusContrastEnhance:
         
         return image, ce, org_bounds
     
-    def _get_bounds(self, image: torch.Tensor, device: torch.device) -> Dict[str, Any]:
-        """Detect fundus boundaries using GPU where possible."""
-        compute_dtype = self._get_compute_dtype(device)
+    def _scale_image_for_detection(
+        self, 
+        gray: torch.Tensor, 
+        h: int, 
+        w: int, 
+        device: torch.device,
+        compute_dtype: torch.dtype
+    ) -> Tuple[torch.Tensor, torch.Tensor, float]:
+        """Scale grayscale image to standard resolution for detection.
         
-        # Extract grayscale (first channel if RGB)
-        if image.dim() == 3 and image.shape[0] >= 1:
-            gray = image[0]  # [H, W]
-        else:
-            gray = image
-        
-        h, w = gray.shape[-2:]
-        
-        # Scale to standard resolution using kornia
+        Returns:
+            gray_scaled: Scaled image tensor
+            M: Affine transformation matrix
+            scale: Scaling factor applied
+        """
         scale = min(self.RESOLUTION / h, self.RESOLUTION / w)
         # Create matrix in compute dtype for warp_affine
         M = self._create_affine_matrix_torch((h, w), self.RESOLUTION, scale, (h // 2, w // 2), 
@@ -254,15 +256,41 @@ class FundusContrastEnhance:
         )
         gray_scaled = gray_scaled.squeeze(0).squeeze(0).float()  # [H, W] - back to float32
         
-        # Edge detection (uses scipy sobel - small CPU operation)
-        xs, ys = self._detect_edges(gray_scaled, device)
+        return gray_scaled, M, scale
+    
+    def _fit_lines_if_needed(
+        self,
+        xs: np.ndarray,
+        ys: np.ndarray,
+        radius: float,
+        center: Tuple[float, float],
+        circle_fraction: float
+    ) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
+        """Fit lines if circle fraction is below threshold.
         
-        # Circle fitting (uses sklearn RANSAC on 256 points)
-        radius, center, circle_fraction = self._fit_circle(xs, ys)
+        Returns:
+            Dictionary of lines (empty if circle_fraction > 0.85)
+        """
+        if circle_fraction > 0.85:
+            return {}
+        return self._fit_lines(xs, ys, radius, center, circle_fraction)
+    
+    def _transform_bounds_to_original(
+        self,
+        center: Tuple[float, float],
+        radius: float,
+        lines: Dict[str, Tuple[np.ndarray, np.ndarray]],
+        M: torch.Tensor,
+        scale: float,
+        device: torch.device
+    ) -> Tuple[Tuple[float, float], float, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
+        """Transform detected bounds back to original image coordinates.
         
-        # Line fitting if needed
-        lines = {} if circle_fraction > 0.85 else self._fit_lines(xs, ys, radius, center, circle_fraction)
-        
+        Returns:
+            center_orig: Center in original coordinates
+            radius_orig: Radius in original coordinates
+            lines_orig: Lines in original coordinates
+        """
         # Transform back to original coordinates using GPU (use float32 for precision)
         M_inv = self._invert_affine_matrix(M, device)
         center_orig = self._transform_point_to_original(center, M_inv, device)
@@ -273,9 +301,42 @@ class FundusContrastEnhance:
             p1_orig = self._transform_point_to_original(p1, M_inv, device)
             lines_orig[k] = (p0_orig, p1_orig)
         
+        radius_orig = radius / scale
+        
+        return center_orig, radius_orig, lines_orig
+    
+    def _get_bounds(self, image: torch.Tensor, device: torch.device) -> Dict[str, Any]:
+        """Detect fundus boundaries using GPU where possible."""
+        compute_dtype = self._get_compute_dtype(device)
+        
+        # Extract grayscale (first channel if RGB)
+        if image.dim() == 3 and image.shape[0] >= 1:
+            gray = image[0]  # [H, W]
+        else:
+            gray = image
+        
+        h, w = gray.shape[-2:]
+        
+        # Scale to standard resolution
+        gray_scaled, M, scale = self._scale_image_for_detection(gray, h, w, device, compute_dtype)
+        
+        # Edge detection (uses scipy sobel - small CPU operation)
+        xs, ys = self._detect_edges(gray_scaled, device)
+        
+        # Circle fitting (uses sklearn RANSAC on 256 points)
+        radius, center, circle_fraction = self._fit_circle(xs, ys)
+        
+        # Line fitting if needed
+        lines = self._fit_lines_if_needed(xs, ys, radius, center, circle_fraction)
+        
+        # Transform back to original coordinates
+        center_orig, radius_orig, lines_orig = self._transform_bounds_to_original(
+            center, radius, lines, M, scale, device
+        )
+        
         return {
             'center': center_orig,
-            'radius': radius / scale,
+            'radius': radius_orig,
             'lines': lines_orig,
             'hw': (h, w)
         }
@@ -523,20 +584,21 @@ class FundusContrastEnhance:
             'hw': (self.square_size, self.square_size)
         }
     
-    def _enhance_contrast(
-        self, 
-        image: torch.Tensor, 
-        bounds: Dict[str, Any], 
-        device: torch.device
+    def _compute_blur_at_reduced_resolution(
+        self,
+        mirrored: torch.Tensor,
+        bounds: Dict[str, Any],
+        device: torch.device,
+        compute_dtype: torch.dtype
     ) -> torch.Tensor:
-        """Apply contrast enhancement using kornia (GPU with mixed precision).
+        """Compute Gaussian blur at reduced resolution for efficiency.
         
-        Major optimization: Blur at 256×256 then upsample instead of full resolution.
-        Uses float16 for blur (2-4x faster) and float32 for final unsharp mask.
+        Warps image to 256×256, applies blur, then warps back to original size.
+        Uses compute dtype (typically float16) for speed.
+        
+        Returns:
+            Blurred image at original size (in compute dtype)
         """
-        compute_dtype = self._get_compute_dtype(device)
-        mirrored = self._mirror_image(image, bounds, device)
-        
         # Efficient blur at reduced resolution
         ce_res = self.REDUCED_BLUR_RESOLUTION
         cy, cx = bounds['center']
@@ -585,6 +647,22 @@ class FundusContrastEnhance:
             padding_mode='zeros'
         )
         
+        return blurred
+    
+    def _apply_unsharp_mask(
+        self,
+        image: torch.Tensor,
+        blurred: torch.Tensor,
+        bounds: Dict[str, Any],
+        device: torch.device
+    ) -> torch.Tensor:
+        """Apply unsharp mask for contrast enhancement.
+        
+        Uses float32 for final computation to preserve quality.
+        
+        Returns:
+            Enhanced image as uint8 tensor
+        """
         # Unsharp mask (use float32 for final computation to preserve quality)
         image_norm = image.unsqueeze(0).float() / 255.0  # [1, C, H, W]
         blurred_fp32 = blurred.float()
@@ -598,6 +676,28 @@ class FundusContrastEnhance:
         # Apply mask (GPU)
         mask = self._make_mask(bounds, device)
         enhanced = enhanced * mask.unsqueeze(0)
+        
+        return enhanced
+    
+    def _enhance_contrast(
+        self, 
+        image: torch.Tensor, 
+        bounds: Dict[str, Any], 
+        device: torch.device
+    ) -> torch.Tensor:
+        """Apply contrast enhancement using kornia (GPU with mixed precision).
+        
+        Major optimization: Blur at 256×256 then upsample instead of full resolution.
+        Uses float16 for blur (2-4x faster) and float32 for final unsharp mask.
+        """
+        compute_dtype = self._get_compute_dtype(device)
+        mirrored = self._mirror_image(image, bounds, device)
+        
+        # Compute blur at reduced resolution
+        blurred = self._compute_blur_at_reduced_resolution(mirrored, bounds, device, compute_dtype)
+        
+        # Apply unsharp mask
+        enhanced = self._apply_unsharp_mask(image, blurred, bounds, device)
         
         return enhanced
     
@@ -673,6 +773,80 @@ class FundusContrastEnhance:
                         mirrored[:, :, bound_val-flip_size:bound_val], dims=[dim_3d]
                     )[:, :, :size-bound_val]
     
+    def _mirror_edges(
+        self,
+        mirrored: torch.Tensor,
+        rect: Dict[str, int],
+        h: int,
+        w: int,
+        d: int,
+        is_2d: bool
+    ) -> None:
+        """Mirror all rectangular edges in-place.
+        
+        Args:
+            mirrored: Tensor to modify in-place
+            rect: Rectangle bounds dictionary
+            h: Image height
+            w: Image width
+            d: Border margin in pixels
+            is_2d: Whether tensor is 2D
+        """
+        min_y = max(rect['min_y'] + d, 0)
+        max_y = min(rect['max_y'] - d, h)
+        min_x = max(rect['min_x'] + d, 0)
+        max_x = min(rect['max_x'] - d, w)
+        
+        # Mirror edges using torch.flip (GPU) - works directly on uint8
+        # Top edge
+        self._mirror_edge(mirrored, min_y, h, min_y, max_y, True, is_2d, 0, 1)
+        # Bottom edge
+        self._mirror_edge(mirrored, max_y, h, min_y, max_y, False, is_2d, 0, 1)
+        # Left edge
+        self._mirror_edge(mirrored, min_x, w, min_x, max_x, True, is_2d, 1, 2)
+        # Right edge
+        self._mirror_edge(mirrored, max_x, w, min_x, max_x, False, is_2d, 1, 2)
+    
+    def _mirror_circle(
+        self,
+        mirrored: torch.Tensor,
+        cx: float,
+        cy: float,
+        radius: float,
+        h: int,
+        w: int,
+        device: torch.device,
+        compute_dtype: torch.dtype,
+        is_2d: bool
+    ) -> None:
+        """Mirror pixels outside circular boundary in-place.
+        
+        Args:
+            mirrored: Tensor to modify in-place
+            cx: Circle center x-coordinate
+            cy: Circle center y-coordinate
+            radius: Circle radius
+            h: Image height
+            w: Image width
+            device: Device for computation
+            compute_dtype: Data type for computation
+            is_2d: Whether tensor is 2D
+        """
+        # Mirror circle using cached grid coordinates (GPU, use compute dtype)
+        x_grid, y_grid = self._get_or_create_grid(h, w, device, compute_dtype)
+        
+        r_sq_norm = ((x_grid - cx) / (self.CIRCLE_SCALE_FACTOR * radius))**2 + ((y_grid - cy) / (self.CIRCLE_SCALE_FACTOR * radius))**2
+        outside = r_sq_norm > 1
+        
+        scale = 1.0 / r_sq_norm[outside]
+        x_in = torch.clamp(torch.round(cx + (x_grid[outside] - cx) * scale).long(), 0, w - 1)
+        y_in = torch.clamp(torch.round(cy + (y_grid[outside] - cy) * scale).long(), 0, h - 1)
+        
+        if is_2d:
+            mirrored[outside] = mirrored[y_in, x_in]
+        else:
+            mirrored[:, outside] = mirrored[:, y_in, x_in]
+    
     def _mirror_image(
         self, 
         image: torch.Tensor, 
@@ -698,35 +872,12 @@ class FundusContrastEnhance:
         # Get rectangular bounds
         d = int(self.BORDER_MARGIN_FRACTION * radius)
         rect = self._get_rect_bounds(bounds['lines'], bounds['center'], radius, (h, w))
-        min_y = max(rect['min_y'] + d, 0)
-        max_y = min(rect['max_y'] - d, h)
-        min_x = max(rect['min_x'] + d, 0)
-        max_x = min(rect['max_x'] - d, w)
         
-        # Mirror edges using torch.flip (GPU) - works directly on uint8
-        # Top edge
-        self._mirror_edge(mirrored, min_y, h, min_y, max_y, True, is_2d, 0, 1)
-        # Bottom edge
-        self._mirror_edge(mirrored, max_y, h, min_y, max_y, False, is_2d, 0, 1)
-        # Left edge
-        self._mirror_edge(mirrored, min_x, w, min_x, max_x, True, is_2d, 1, 2)
-        # Right edge
-        self._mirror_edge(mirrored, max_x, w, min_x, max_x, False, is_2d, 1, 2)
+        # Mirror edges
+        self._mirror_edges(mirrored, rect, h, w, d, is_2d)
         
-        # Mirror circle using cached grid coordinates (GPU, use compute dtype)
-        x_grid, y_grid = self._get_or_create_grid(h, w, device, compute_dtype)
-        
-        r_sq_norm = ((x_grid - cx) / (self.CIRCLE_SCALE_FACTOR * radius))**2 + ((y_grid - cy) / (self.CIRCLE_SCALE_FACTOR * radius))**2
-        outside = r_sq_norm > 1
-        
-        scale = 1.0 / r_sq_norm[outside]
-        x_in = torch.clamp(torch.round(cx + (x_grid[outside] - cx) * scale).long(), 0, w - 1)
-        y_in = torch.clamp(torch.round(cy + (y_grid[outside] - cy) * scale).long(), 0, h - 1)
-        
-        if is_2d:
-            mirrored[outside] = mirrored[y_in, x_in]
-        else:
-            mirrored[:, outside] = mirrored[:, y_in, x_in]
+        # Mirror circle
+        self._mirror_circle(mirrored, cx, cy, radius, h, w, device, compute_dtype, is_2d)
         
         return mirrored
     
