@@ -17,7 +17,7 @@ class ClassificationEnsemble(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.inference_fn = None
-        self.predict_batch_size = 16  # Default: process 16 images at once (lightweight)
+        self.predict_batch_size = 1  # Default: process 1 image at a time (no speed benefit from batching)
 
     def forward(self, img: torch.Tensor) -> torch.Tensor:
         return self.ensemble(img)

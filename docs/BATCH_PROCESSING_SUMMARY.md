@@ -8,7 +8,7 @@
 
 Successfully implemented batch processing support with automatic batch splitting for all model types in `vascx_simplify`, maintaining 100% backward compatibility.
 
-**IMPORTANT UPDATE**: Performance testing revealed that **batch processing does NOT improve speed for heatmap regression models** due to sliding window complexity. Batch size primarily affects GPU memory usage, not performance.
+**IMPORTANT UPDATE**: Performance testing revealed that **batch processing does NOT improve speed for any model types** in this project. Batch size primarily affects GPU memory usage and allows processing multiple images in one call, but does not provide performance benefits.
 
 ## ✨ Key Features Implemented
 
@@ -25,11 +25,13 @@ Successfully implemented batch processing support with automatic batch splitting
 - Batched torch.Tensor `[N, C, H, W]` → `[N, ...]` output
 
 ### 3. **Optimized Default Batch Sizes** ⚡
-Each model type has tuned defaults based on memory requirements AND performance:
-- **EnsembleSegmentation**: `batch_size=4` (sliding window is memory-intensive, batch helps speed)
-- **ClassificationEnsemble**: `batch_size=16` (lightweight, batch significantly improves speed)
-- **RegressionEnsemble**: `batch_size=16` (similar to classification, batch helps speed)
-- **HeatmapRegressionEnsemble**: `batch_size=1` ⚠️ **UPDATED** (batch does NOT improve speed, only increases memory)
+Each model type has tuned defaults based on memory requirements:
+- **EnsembleSegmentation**: `batch_size=1` (no speed benefit from batching)
+- **ClassificationEnsemble**: `batch_size=1` (no speed benefit from batching)
+- **RegressionEnsemble**: `batch_size=1` (no speed benefit from batching)
+- **HeatmapRegressionEnsemble**: `batch_size=1` (no speed benefit from batching)
+
+All defaults set to 1 since testing showed no performance improvement from batching across all model types.
 
 ### 4. **User Override** 🎛️
 ```python
@@ -111,10 +113,11 @@ Tests to run with real models:
 
 ## 📊 Expected Performance
 
-Based on design goals:
-- **Speedup**: 2-3x faster than sequential for 10 images
-- **Memory**: No OOM errors with automatic splitting
+Based on testing results:
+- **Speedup**: No speed improvement from batching observed across all model types
+- **Memory**: Batch size primarily affects GPU memory usage
 - **Consistency**: Numerically equivalent results (within floating-point tolerance)
+- **Use case**: Batch processing useful for convenience (processing multiple images in one call), not for performance
 
 ## 🔄 Backward Compatibility
 
@@ -213,9 +216,9 @@ preds = model.predict(images, batch_size=8)
 
 1. **Testing with Real Models** 📸
    - Run `examples/05_batch_processing.py` with actual model files
-   - Verify performance claims (2-3x speedup)
    - Test on different GPU configurations
    - Verify numerical consistency
+   - Confirm no speed improvement from batching
 
 2. **Edge Case Testing** 🧪
    - Empty list input

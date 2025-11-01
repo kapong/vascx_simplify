@@ -161,18 +161,13 @@ predictions = model.predict(images, batch_size=8)  # Process 8 at once
 ```
 
 **Key Features**:
-- 🚀 **Faster for most models** - 2-3x speedup for segmentation/classification
-- ⚠️ **Exception: Heatmap models** - NO speed benefit, only memory management
-- 🛡️ **Automatic OOM prevention** - large batches split automatically
+- ️ **Automatic OOM prevention** - large batches split automatically
 - 🔄 **100% backward compatible** - existing single-image code works unchanged
 - ⚙️ **Configurable** - override batch size per call or use smart defaults
 - 📊 **Flexible inputs** - accepts PIL.Image, torch.Tensor, or lists of either
 
 **Default Batch Sizes by Model Type**:
-- **Segmentation**: `batch_size=4` (✅ 2-3x faster in batches)
-- **Classification**: `batch_size=16` (✅ 2-3x faster in batches)
-- **Regression**: `batch_size=16` (✅ 2-3x faster in batches)
-- **Heatmap (Fovea)**: `batch_size=1` (⚠️ NO speed benefit from batching)
+- **All Models**: `batch_size=1` (no speed benefit from batching observed in testing)
 
 **Usage Patterns**:
 
@@ -205,10 +200,9 @@ result = pred[0]  # Access with [0] as before
 ```
 
 **Performance Tips**:
-- ✅ **Use batch processing for segmentation/classification** - 2-3x speedup with 3+ images
-- ⚠️ **Heatmap models (fovea)**: batching doesn't improve speed, only manages memory
-- Default batch sizes are optimized for most GPUs (8-16GB VRAM)
-- Increase batch_size for high-memory GPUs (24GB+)
+- Default batch size is set to 1 for all models (no speed benefit observed from batching)
+- You can override batch_size parameter for memory management if processing large numbers of images
+- Increase batch_size for high-memory GPUs (24GB+) to process more images simultaneously
 - Decrease batch_size if you encounter OOM errors
 - List of tensors is slightly faster than list of PIL.Images
 
