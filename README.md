@@ -149,7 +149,7 @@ enhancer = FundusContrastEnhance(
 
 # Load and convert image to tensor
 rgb_image = Image.open('fundus.jpg')
-img_tensor = torch.from_numpy(np.array(rgb_image)).permute(2, 0, 1).cuda()
+img_tensor = torch.from_numpy(np.array(rgb_image)).permute(2, 0, 1).cuda()  # you can use CPU/GPU to process
 
 # Apply contrast enhancement
 original, enhanced, bounds = enhancer(img_tensor)
