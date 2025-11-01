@@ -160,6 +160,8 @@ enhanced_np = enhanced.cpu().permute(1, 2, 0).numpy()
 
 ![Contrast Enhancement Result](https://github.com/kapong/vascx_simplify/raw/main/examples/contrast_enhancement_result.png)
 
+![Contrast Enhancement Detailed](https://github.com/kapong/vascx_simplify/raw/main/examples/contrast_enhancement_detailed.png)
+
 **Full example**: See [`examples/07_contrast_enhancement.py`](examples/07_contrast_enhancement.py) for detailed visualization with before/after comparison, zoomed regions, and statistics.
 
 ### Batch Processing
