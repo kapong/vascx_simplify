@@ -2,3 +2,4 @@ kornia
 scikit-learn
 torch
 huggingface_hub
+pillow
