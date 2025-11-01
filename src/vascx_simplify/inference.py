@@ -8,7 +8,7 @@ from .preprocess import VASCXTransform
 DEFAULT_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Constants for sliding window inference
-GAUSSIAN_SIGMA_FRACTION = 0.125  # MONAI's standard sigma for Gaussian importance map
+GAUSSIAN_SIGMA_FRACTION = 0.125  # Standard sigma for Gaussian importance map
 MIN_WEIGHT_THRESHOLD = 1e-8  # Minimum weight threshold to prevent division by zero
 
 
@@ -21,7 +21,10 @@ def sliding_window_inference(
     mode: str = "gaussian",
 ) -> torch.Tensor:
     """
-    Sliding window inference matching MONAI's implementation exactly.
+    Sliding window inference with proper batch handling.
+    
+    Limits total batch size to sw_batch_size by adjusting windows per iteration
+    based on input batch size.
     """
     batch_size, channels, height, width = inputs.shape
     window_h, window_w = roi_size
@@ -65,11 +68,23 @@ def sliding_window_inference(
 
     count_map = torch.zeros((batch_size, height, width), device=inputs.device, dtype=inputs.dtype)
 
-    # Process windows in batches
-    for i in range(0, len(slices), sw_batch_size):
-        batch_slices = slices[i : i + sw_batch_size]
+    # Adjust windows per iteration to maintain GPU utilization
+    # For single image: use sw_batch_size windows
+    # For batch: reduce windows to keep total batch reasonable, but not too small
+    # Target: total batch size between sw_batch_size and sw_batch_size*2
+    if batch_size == 1:
+        windows_per_iter = sw_batch_size
+    else:
+        # For multiple images, aim for sw_batch_size total patches
+        windows_per_iter = max(1, sw_batch_size // batch_size)
+        # But don't go too small - minimum 1 window per image batch
+    
+    # Process windows
+    for i in range(0, len(slices), windows_per_iter):
+        batch_slices = slices[i : i + windows_per_iter]
 
-        # Extract and concatenate windows
+        # Extract windows from all batch images at each position
+        # This creates [num_windows * batch_size, C, H, W]
         windows = torch.cat(
             [inputs[:, :, h_s:h_e, w_s:w_e] for h_s, h_e, w_s, w_e in batch_slices], dim=0
         )
@@ -80,8 +95,9 @@ def sliding_window_inference(
             if isinstance(batch_pred, tuple):
                 batch_pred = torch.stack(batch_pred, dim=1)
 
-        # Split and accumulate
+        # Split and accumulate - results are interleaved by batch
         for j, (h_start, h_end, w_start, w_end) in enumerate(batch_slices):
+            # Extract predictions for this window from all batch images
             pred = batch_pred[j * batch_size : (j + 1) * batch_size]
 
             output[..., h_start:h_end, w_start:w_end] += pred * importance_map_exp
@@ -595,7 +611,7 @@ class HeatmapRegressionEnsemble(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.sw_batch_size = 1
-        self.predict_batch_size = 2  # Default: process 2 images at once (memory-intensive)
+        self.predict_batch_size = 1  # Default: process 1 image at a time (batch doesn't improve speed)
 
     def proba_process(
         self, 

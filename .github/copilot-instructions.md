@@ -3,6 +3,41 @@
 ## Project Overview
 This is a PyTorch library for vessel and fundus image analysis with GPU-accelerated preprocessing and inference utilities. The project emphasizes performance, simplicity, and minimal dependencies.
 
+## Development Environment
+
+### Virtual Environment
+- **Always use `.venv`**: This project uses a virtual environment located at `.venv/`
+- **Running Python commands**: Always activate `.venv` before running Python commands
+  ```powershell
+  # Windows PowerShell
+  .venv\Scripts\Activate.ps1; python script.py
+  ```
+  ```bash
+  # Linux/Mac
+  source .venv/bin/activate && python script.py
+  ```
+
+### Running Examples
+- **Activate venv, then cd**: When running example scripts from `examples/*.py`, activate `.venv` first, then `cd` into the `examples/` directory
+  ```powershell
+  # Windows PowerShell
+  .venv\Scripts\Activate.ps1; cd examples; python 01_artery_vein.py
+  ```
+  ```bash
+  # Linux/Mac
+  source .venv/bin/activate && cd examples && python 01_artery_vein.py
+  ```
+- **Why**: Examples may reference relative paths for images or outputs that assume execution from the `examples/` directory
+
+### Python Environment
+- **CUDA-enabled PyTorch**: The `.venv` has PyTorch with CUDA 12.4 support installed
+- **Verify CUDA**: Before running GPU-intensive tasks, you can verify CUDA is available:
+  ```python
+  import torch
+  print(f"CUDA available: {torch.cuda.is_available()}")
+  print(f"Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+  ```
+
 ## Core Principles
 
 ### 1. Best Practices Without Over-Engineering

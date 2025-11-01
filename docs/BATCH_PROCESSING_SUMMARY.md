@@ -1,12 +1,14 @@
 # Batch Processing Implementation Summary
 
-**Branch**: `feat/batch-processing`  
-**Status**: ✅ **COMPLETE** - Ready for testing and merge  
+**Branch**: `main`  
+**Status**: ✅ **COMPLETE** - Updated based on performance testing  
 **Date**: November 1, 2025
 
 ## 🎯 Implementation Overview
 
-Successfully implemented comprehensive batch processing support with automatic batch splitting for all model types in `vascx_simplify`, maintaining 100% backward compatibility.
+Successfully implemented batch processing support with automatic batch splitting for all model types in `vascx_simplify`, maintaining 100% backward compatibility.
+
+**IMPORTANT UPDATE**: Performance testing revealed that **batch processing does NOT improve speed for heatmap regression models** due to sliding window complexity. Batch size primarily affects GPU memory usage, not performance.
 
 ## ✨ Key Features Implemented
 
@@ -23,11 +25,11 @@ Successfully implemented comprehensive batch processing support with automatic b
 - Batched torch.Tensor `[N, C, H, W]` → `[N, ...]` output
 
 ### 3. **Optimized Default Batch Sizes** ⚡
-Each model type has tuned defaults based on memory requirements:
-- **EnsembleSegmentation**: `batch_size=4` (sliding window is memory-intensive)
-- **ClassificationEnsemble**: `batch_size=16` (lightweight forward pass)
-- **RegressionEnsemble**: `batch_size=16` (similar to classification)
-- **HeatmapRegressionEnsemble**: `batch_size=2` (heatmaps are very memory-intensive)
+Each model type has tuned defaults based on memory requirements AND performance:
+- **EnsembleSegmentation**: `batch_size=4` (sliding window is memory-intensive, batch helps speed)
+- **ClassificationEnsemble**: `batch_size=16` (lightweight, batch significantly improves speed)
+- **RegressionEnsemble**: `batch_size=16` (similar to classification, batch helps speed)
+- **HeatmapRegressionEnsemble**: `batch_size=1` ⚠️ **UPDATED** (batch does NOT improve speed, only increases memory)
 
 ### 4. **User Override** 🎛️
 ```python
