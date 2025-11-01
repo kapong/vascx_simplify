@@ -10,6 +10,14 @@ import torch.nn.functional as F
 from scipy.ndimage import sobel
 from sklearn.linear_model import RANSACRegressor
 
+# Import utility functions from vascx_simplify.utils
+from ..utils.geometry import create_coordinate_grid
+from ..utils.transforms import (
+    create_affine_matrix,
+    invert_affine_matrix,
+    transform_point,
+)
+
 DEFAULT_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -123,11 +131,7 @@ class FundusContrastEnhance:
         Returns:
             3x3 inverted matrix (float32)
         """
-        M_fp32 = M.float()  # Convert to float32 for accurate inverse
-        M_3x3 = torch.cat(
-            [M_fp32, torch.tensor([[0.0, 0.0, 1.0]], device=device, dtype=torch.float32)], dim=0
-        )
-        return torch.inverse(M_3x3)
+        return invert_affine_matrix(M, device)
 
     def _transform_point_to_original(
         self, point: Tuple[float, float], M_inv: torch.Tensor, device: torch.device
@@ -142,9 +146,7 @@ class FundusContrastEnhance:
         Returns:
             (x, y) coordinates in original space as numpy array
         """
-        point_homo = torch.tensor([point[0], point[1], 1.0], device=device, dtype=torch.float32)
-        point_orig_homo = M_inv @ point_homo
-        return (point_orig_homo[:2] / point_orig_homo[2]).cpu().numpy()
+        return transform_point(point, M_inv, device)
 
     def _get_or_create_grid(
         self, h: int, w: int, device: torch.device, dtype: torch.dtype
@@ -162,7 +164,7 @@ class FundusContrastEnhance:
         """
         cache_key = (h, w, device, dtype)
         if cache_key not in self._grid_cache:
-            self._grid_cache[cache_key] = self._create_coordinate_grid(h, w, device, dtype)
+            self._grid_cache[cache_key] = create_coordinate_grid(h, w, device, dtype)
         return self._grid_cache[cache_key]
 
     def _create_coordinate_grid(
@@ -179,10 +181,7 @@ class FundusContrastEnhance:
         Returns:
             Tuple of (x_grid, y_grid) coordinate meshgrids
         """
-        y_coords = torch.arange(h, device=device, dtype=dtype)
-        x_coords = torch.arange(w, device=device, dtype=dtype)
-        y_grid, x_grid = torch.meshgrid(y_coords, x_coords, indexing="ij")
-        return (x_grid, y_grid)
+        return create_coordinate_grid(h, w, device, dtype)
 
     def __call__(self, img: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]]:
         """
@@ -994,8 +993,5 @@ class FundusContrastEnhance:
 
         Always use float32 for affine matrices to ensure precision.
         """
-        cy, cx = center
-        ty, tx = out_size / 2, out_size / 2
-        return torch.tensor(
-            [[scale, 0, tx - scale * cx], [0, scale, ty - scale * cy]], dtype=dtype, device=device
-        )
+        return create_affine_matrix(in_size, out_size, scale, center, device, dtype)
+
