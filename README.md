@@ -123,6 +123,35 @@ q1_reject, q2_usable, q3_good = prediction[0].tolist()
 
 ![Image Quality Classification Result](https://github.com/kapong/vascx_simplify/raw/main/examples/quality_classification_result.png)
 
+### Contrast Enhancement
+
+Enhance fundus image contrast with GPU-accelerated preprocessing:
+
+```python
+from vascx_simplify.preprocess import FundusContrastEnhance
+from PIL import Image
+import torch
+import numpy as np
+
+# Initialize enhancer
+enhancer = FundusContrastEnhance(
+    use_fp16=True,      # Use mixed precision for faster processing
+    square_size=512,    # Optional: crop to square size
+)
+
+# Load and convert image to tensor
+rgb_image = Image.open('fundus.jpg')
+img_tensor = torch.from_numpy(np.array(rgb_image)).permute(2, 0, 1).cuda()
+
+# Apply contrast enhancement
+original, enhanced, bounds = enhancer(img_tensor)
+
+# Convert back to numpy for saving/visualization
+enhanced_np = enhanced.cpu().permute(1, 2, 0).numpy()
+```
+
+![Contrast Enhancement Result](https://github.com/kapong/vascx_simplify/raw/main/examples/contrast_enhancement_result.png)
+
 ### Batch Processing
 
 Process multiple images with automatic batch splitting to prevent out-of-memory errors:
