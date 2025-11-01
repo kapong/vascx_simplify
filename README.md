@@ -66,6 +66,8 @@ prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 
 ![Artery/Vein Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/artery_vein_segmentation_result.png)
 
+**Full example**: See [`examples/01_artery_vein.py`](examples/01_artery_vein.py)
+
 ### Optic Disc Segmentation
 
 Detect and segment the optic disc:
@@ -82,6 +84,8 @@ prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
 
 ![Optic Disc Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/disc_segmentation_result.png)
+
+**Full example**: See [`examples/02_disc_segment.py`](examples/02_disc_segment.py)
 
 ### Fovea Detection
 
@@ -103,6 +107,8 @@ fovea_y = prediction[0, 0, 1].item()
 
 ![Fovea Detection Result](https://github.com/kapong/vascx_simplify/raw/main/examples/fovea_detection_result.png)
 
+**Full example**: See [`examples/03_fovea_regression.py`](examples/03_fovea_regression.py)
+
 ### Image Quality Assessment
 
 Classify fundus image quality (Reject/Usable/Good):
@@ -122,6 +128,8 @@ q1_reject, q2_usable, q3_good = prediction[0].tolist()
 ```
 
 ![Image Quality Classification Result](https://github.com/kapong/vascx_simplify/raw/main/examples/quality_classification_result.png)
+
+**Full example**: See [`examples/04_quality_classify.py`](examples/04_quality_classify.py)
 
 ### Contrast Enhancement
 
@@ -151,6 +159,8 @@ enhanced_np = enhanced.cpu().permute(1, 2, 0).numpy()
 ```
 
 ![Contrast Enhancement Result](https://github.com/kapong/vascx_simplify/raw/main/examples/contrast_enhancement_result.png)
+
+**Full example**: See [`examples/07_contrast_enhancement.py`](examples/07_contrast_enhancement.py) for detailed visualization with before/after comparison, zoomed regions, and statistics.
 
 ### Batch Processing
 
@@ -235,8 +245,9 @@ result = pred[0]  # Access with [0] as before
 - Decrease batch_size if you encounter OOM errors
 - List of tensors is slightly faster than list of PIL.Images
 
-See `examples/05_batch_processing.py` for segmentation/classification batch demo.
-See `examples/05_batch_fovea.py` for heatmap regression batch analysis.
+**Full examples**: 
+- [`examples/05_batch_fovea.py`](examples/05_batch_fovea.py) - Batch processing for heatmap regression
+- [`examples/06_utils_demo.py`](examples/06_utils_demo.py) - Utility functions demonstration
 
 ## License
 
