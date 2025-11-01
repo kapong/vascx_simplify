@@ -107,7 +107,7 @@ from vascx_simplify import ClassificationEnsemble, VASCXTransform, from_huggingf
 from PIL import Image
 
 model_path = from_huggingface('Eyened/vascx:quality/quality.pt')
-model = ClassificationEnsemble(model_path, VASCXTransform(have_ce=False))
+model = ClassificationEnsemble(model_path, VASCXTransform(use_ce=False))
 
 rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, 3] with quality scores (already softmaxed)
@@ -120,7 +120,11 @@ q1_reject, q2_usable, q3_good = prediction[0].tolist()
 
 ### Batch Processing
 
-Process multiple images efficiently with automatic batch splitting to prevent out-of-memory errors:
+Process multiple images with automatic batch splitting to prevent out-of-memory errors:
+
+⚠️ **Important**: Batch processing speed benefit depends on model type:
+- **Segmentation/Classification/Regression**: 2-3x faster than sequential
+- **Heatmap Regression (fovea)**: NO speed improvement (due to sliding window complexity)
 
 ```python
 from vascx_simplify import EnsembleSegmentation, VASCXTransform, from_huggingface
@@ -133,7 +137,7 @@ model = EnsembleSegmentation(model_path, VASCXTransform())
 # Load multiple images
 images = [Image.open(f'fundus_{i}.jpg') for i in range(10)]
 
-# Batch prediction (much faster than sequential processing)
+# Batch prediction (much faster for segmentation/classification)
 predictions = model.predict(images)  # Returns [10, H, W]
 # Automatically splits into chunks of 4 (default for segmentation)
 
@@ -152,17 +156,18 @@ predictions = model.predict(images, batch_size=8)  # Process 8 at once
 ```
 
 **Key Features**:
-- 🚀 **2-3x faster** than processing images sequentially
+- 🚀 **Faster for most models** - 2-3x speedup for segmentation/classification
+- ⚠️ **Exception: Heatmap models** - NO speed benefit, only memory management
 - 🛡️ **Automatic OOM prevention** - large batches split automatically
 - 🔄 **100% backward compatible** - existing single-image code works unchanged
 - ⚙️ **Configurable** - override batch size per call or use smart defaults
 - 📊 **Flexible inputs** - accepts PIL.Image, torch.Tensor, or lists of either
 
-**Memory Management**: Each model type has sensible default batch sizes:
-- **Segmentation**: 4 images (sliding window is memory-intensive)
-- **Classification**: 16 images (lightweight forward pass)
-- **Regression**: 16 images
-- **Heatmap**: 2 images (heatmaps are very memory-intensive)
+**Default Batch Sizes by Model Type**:
+- **Segmentation**: `batch_size=4` (✅ 2-3x faster in batches)
+- **Classification**: `batch_size=16` (✅ 2-3x faster in batches)
+- **Regression**: `batch_size=16` (✅ 2-3x faster in batches)
+- **Heatmap (Fovea)**: `batch_size=1` (⚠️ NO speed benefit from batching)
 
 **Usage Patterns**:
 
@@ -195,13 +200,15 @@ result = pred[0]  # Access with [0] as before
 ```
 
 **Performance Tips**:
-- Use batch processing for 3+ images to see significant speedup
+- ✅ **Use batch processing for segmentation/classification** - 2-3x speedup with 3+ images
+- ⚠️ **Heatmap models (fovea)**: batching doesn't improve speed, only manages memory
 - Default batch sizes are optimized for most GPUs (8-16GB VRAM)
 - Increase batch_size for high-memory GPUs (24GB+)
 - Decrease batch_size if you encounter OOM errors
 - List of tensors is slightly faster than list of PIL.Images
 
-See `examples/05_batch_processing.py` for a complete performance demonstration.
+See `examples/05_batch_processing.py` for segmentation/classification batch demo.
+See `examples/05_batch_fovea.py` for heatmap regression batch analysis.
 
 ## License
 

@@ -432,7 +432,7 @@ def test_batch_all_models():
     assert seg_preds.shape == (5, H, W)
     
     # Classification
-    cls_model = ClassificationEnsemble(cls_path, VASCXTransform(have_ce=False))
+    cls_model = ClassificationEnsemble(cls_path, VASCXTransform(use_ce=False))
     cls_preds = cls_model.predict(images)
     assert cls_preds.shape == (5, 3)
     

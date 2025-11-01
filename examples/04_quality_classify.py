@@ -27,8 +27,8 @@ def main():
     model_path = from_huggingface('Eyened/vascx:quality/quality.pt')
     
     # Step 2: Initialize preprocessing transform and model
-    # Note: have_ce=False means no contrast enhancement for quality assessment
-    model = ClassificationEnsemble(model_path, VASCXTransform(have_ce=False))
+    # Note: use_ce=False means no contrast enhancement for quality assessment
+    model = ClassificationEnsemble(model_path, VASCXTransform(use_ce=False))
     
     # Step 3: Load and process the image
     print(f"Loading image: {IMG_PATH}")

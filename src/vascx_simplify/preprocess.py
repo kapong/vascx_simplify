@@ -1005,23 +1005,23 @@ class VASCXTransform:
     def __init__(
         self,
         size: int = 1024,
-        have_ce: bool = True,
+        use_ce: bool = True,
         use_fp16: bool = True,
         device: Union[torch.device, str] = DEFAULT_DEVICE,
     ):
         """
         Args:
             size: Output size
-            have_ce: Whether to use contrast enhancement
+            use_ce: Whether to use contrast enhancement
             use_fp16: Use float16 for compute-intensive ops
             device: Device to run transformations on ('cuda' or 'cpu')
         """
         self.size = size
         self.device = torch.device(device)
-        self.have_ce = have_ce
+        self.use_ce = use_ce
         self.use_fp16 = use_fp16
 
-        if self.have_ce:
+        if self.use_ce:
             self.contrast_enhancer = FundusContrastEnhance(square_size=size, use_fp16=use_fp16)
             # 6 channels (rgb + ce)
             self.mean = torch.tensor(
@@ -1072,7 +1072,7 @@ class VASCXTransform:
             else:
                 image = image.clamp(0, 255).to(torch.uint8)
 
-        if self.have_ce:
+        if self.use_ce:
             # Apply contrast enhancement
             rgb, ce, bounds = self.contrast_enhancer(image)
             # Concatenate RGB and CE
