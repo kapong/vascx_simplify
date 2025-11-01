@@ -1,5 +1,10 @@
 # vascx_simplify
 
+[![PyPI version](https://badge.fury.io/py/vascx-simplify.svg)](https://badge.fury.io/py/vascx-simplify)
+[![Python](https://img.shields.io/pypi/pyversions/vascx-simplify.svg)](https://pypi.org/project/vascx-simplify/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub](https://img.shields.io/badge/github-kapong%2Fvascx__simplify-blue.svg)](https://github.com/kapong/vascx_simplify)
+
 A PyTorch library for vessel and fundus image analysis, providing GPU-accelerated preprocessing and inference utilities for medical imaging tasks.
 
 **Note:** This is a simplified rewrite of [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) by Eyened.
