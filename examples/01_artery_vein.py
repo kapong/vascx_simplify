@@ -82,7 +82,9 @@ def main():
     plt.tight_layout()
     plt.savefig("artery_vein_segmentation_result.png", dpi=150, bbox_inches="tight")
     print("Result saved as 'artery_vein_segmentation_result.png'")
-    plt.show()
+    plt.show(block=False)
+    plt.pause(5)
+    plt.close('all')
 
     # Step 7: Print statistics
     artery_pixels = np.sum(pred_classes == 1)

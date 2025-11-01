@@ -80,7 +80,9 @@ def main():
     plt.tight_layout()
     plt.savefig("disc_segmentation_result.png", dpi=150, bbox_inches="tight")
     print("Result saved as 'disc_segmentation_result.png'")
-    plt.show()
+    plt.show(block=False)
+    plt.pause(5)
+    plt.close('all')
 
     # Step 7: Print statistics
     disc_pixels = np.sum(pred_classes == 1)

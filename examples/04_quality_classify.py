@@ -155,7 +155,9 @@ def main():
     plt.tight_layout()
     plt.savefig("quality_classification_result.png", dpi=150, bbox_inches="tight")
     print("\nResult saved as 'quality_classification_result.png'")
-    plt.show()
+    plt.show(block=False)
+    plt.pause(5)
+    plt.close('all')
 
 
 if __name__ == "__main__":

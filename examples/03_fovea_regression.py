@@ -98,7 +98,9 @@ def main():
     plt.tight_layout()
     plt.savefig("fovea_detection_result.png", dpi=150, bbox_inches="tight")
     print("\nResult saved as 'fovea_detection_result.png'")
-    plt.show()
+    plt.show(block=False)
+    plt.pause(5)
+    plt.close('all')
 
     # Step 7: Additional visualization - simple scatter plot
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
@@ -120,7 +122,9 @@ def main():
     plt.tight_layout()
     plt.savefig("fovea_simple_result.png", dpi=150, bbox_inches="tight")
     print("Simple result saved as 'fovea_simple_result.png'")
-    plt.show()
+    plt.show(block=False)
+    plt.pause(5)
+    plt.close('all')
 
 
 if __name__ == "__main__":
