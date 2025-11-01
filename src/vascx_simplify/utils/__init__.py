@@ -9,9 +9,6 @@ This module provides utilities for:
 - Coordinate transformations
 """
 
-# HuggingFace utilities
-from .huggingface import from_huggingface
-
 # Geometric utilities
 from .geometry import (
     apply_circular_crop,
@@ -22,6 +19,9 @@ from .geometry import (
     line_circle_intersection,
     polar_transform,
 )
+
+# HuggingFace utilities
+from .huggingface import from_huggingface
 
 # Image utilities
 from .image import (

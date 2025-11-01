@@ -34,4 +34,3 @@ __all__ = [  # noqa: F405
     "QUALITY_COLORS",  # noqa: F405
     "QUALITY_LABELS",  # noqa: F405
 ]
-

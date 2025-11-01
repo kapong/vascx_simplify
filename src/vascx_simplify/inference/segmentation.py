@@ -17,7 +17,9 @@ class EnsembleSegmentation(EnsembleBase):
     ):
         super().__init__(fpath, transforms, device)
         self.sw_batch_size = 16
-        self.predict_batch_size = 1  # Default: process 1 image at a time (no speed benefit from batching)
+        self.predict_batch_size = (
+            1  # Default: process 1 image at a time (no speed benefit from batching)
+        )
 
     def proba_process(
         self,

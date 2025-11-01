@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple
 
 import kornia.filters as KF
 import kornia.geometry as K_geom
@@ -994,4 +994,3 @@ class FundusContrastEnhance:
         Always use float32 for affine matrices to ensure precision.
         """
         return create_affine_matrix(in_size, out_size, scale, center, device, dtype)
-
