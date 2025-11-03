@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/vascx-simplify.svg?v=1)](https://badge.fury.io/py/vascx-simplify)
 [![Python](https://img.shields.io/pypi/pyversions/vascx-simplify.svg)](https://pypi.org/project/vascx-simplify/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![GitHub](https://img.shields.io/badge/github-kapong%2Fvascx__simplify-blue.svg)](https://github.com/kapong/vascx_simplify)
 
 A PyTorch library for vessel and fundus image analysis, providing GPU-accelerated preprocessing and inference utilities for medical imaging tasks.
@@ -267,7 +267,7 @@ If you use this software in your research, please cite both the original paper a
   author={Phienphanich, Phongphan},
   year={2025},
   url={https://github.com/kapong/vascx_simplify},
-  version={0.1.9}
+  version={0.1.10}
 }
 ```
 
@@ -277,7 +277,7 @@ This project was developed with significant assistance from AI tools (GitHub Cop
 
 ## License
 
-MIT License - see LICENSE file for details.
+GNU Affero General Public License v3.0 (AGPL-3.0) - see LICENSE file for details.
 
 ## Author
 
