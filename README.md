@@ -1,4 +1,4 @@
-# vascx_simplify
+# VASCX Simplify: GPU-Accelerated Vessel Analysis and Fundus Image Processing Toolkit
 
 [![PyPI version](https://badge.fury.io/py/vascx-simplify.svg?v=1)](https://badge.fury.io/py/vascx-simplify)
 [![Python](https://img.shields.io/pypi/pyversions/vascx-simplify.svg)](https://pypi.org/project/vascx-simplify/)
@@ -8,10 +8,6 @@
 A PyTorch library for vessel and fundus image analysis, providing GPU-accelerated preprocessing and inference utilities for medical imaging tasks.
 
 **Note:** This is a simplified rewrite of [rtnls_vascx_models](https://github.com/Eyened/rtnls_vascx_models) by Eyened.
-
-## AI Usage Disclaimer
-
-This project was developed with significant assistance from AI tools (GitHub Copilot, ChatGPT, Claude) for code organization, refactoring, documentation, and packaging.
 
 ## Features
 
@@ -248,6 +244,36 @@ result = pred[0]  # Access with [0] as before
 **Full examples**: 
 - [`examples/05_batch_fovea.py`](examples/05_batch_fovea.py) - Batch processing for heatmap regression
 - [`examples/06_utils_demo.py`](examples/06_utils_demo.py) - Utility functions demonstration
+
+## Citation
+
+If you use this software in your research, please cite both the original paper and this software repository:
+
+### Original Paper
+```bibtex
+@article{quiros2024vascx,
+  title={VascX Models: Model Ensembles for Retinal Vascular Analysis from Color Fundus Images},
+  author={Jose Vargas Quiros and Bart Liefers and Karin van Garderen and Jeroen Vermeulen and Eyened Reading Center and Sinergia Consortium and Caroline Klaver},
+  journal={arXiv preprint arXiv:2409.16016},
+  year={2024},
+  url={https://arxiv.org/abs/2409.16016}
+}
+```
+
+### Software Repository
+```bibtex
+@software{vascx_simplify2024,
+  title={VASCX Simplify: GPU-Accelerated Vessel Analysis and Fundus Image Processing Toolkit},
+  author={Phienphanich, Phongphan},
+  year={2025},
+  url={https://github.com/kapong/vascx_simplify},
+  version={0.1.9}
+}
+```
+
+## AI Usage Disclaimer
+
+This project was developed with significant assistance from AI tools (GitHub Copilot, ChatGPT, Claude) for code organization, refactoring, documentation, and packaging.
 
 ## License
 
