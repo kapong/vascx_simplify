@@ -17,6 +17,42 @@ A PyTorch library for vessel and fundus image analysis, providing GPU-accelerate
 - **HuggingFace Integration**: Easy model loading from HuggingFace Hub
 - **Minimal Dependencies**: Uses fewer dependency libraries for easier installation and maintenance
 
+## What's New in v0.1.11
+
+### 🎨 Enhanced Contrast Enhancement with Simple API
+
+New simplified contrast enhancement class with automatic parameter tuning:
+
+- **`SimpleContrastEnhance`**: Easy-to-use class with sensible defaults
+  - Automatic sigma calculation based on image size
+  - Optional enhancement factor control (2x, 4x, 6x, or auto)
+  - GPU-accelerated processing with mixed precision support
+  - Preserves original image characteristics
+  - Memory-efficient implementation
+
+- **Two Processing Modes**:
+  - `FundusContrastEnhance`: Full pipeline with fundus-specific preprocessing (crop, RANSAC ellipse fitting)
+  - `SimpleContrastEnhance`: Pure contrast enhancement without geometric preprocessing
+
+- **Flexible Usage**:
+  ```python
+  from vascx_simplify.preprocess import SimpleContrastEnhance
+  
+  # Auto mode (recommended)
+  enhancer = SimpleContrastEnhance(factor='auto')
+  enhanced = enhancer(image_tensor)
+  
+  # Manual factor control
+  enhancer = SimpleContrastEnhance(factor=4.0)
+  enhanced = enhancer(image_tensor)
+  ```
+
+**Examples**: 
+- [`examples/08_simple_contrast.py`](examples/08_simple_contrast.py) - Parameter exploration and comparison
+- [`examples/09_simple_class_demo.py`](examples/09_simple_class_demo.py) - Simple API usage with before/after comparison
+
+
+
 ## Installation
 
 ```bash
@@ -60,7 +96,7 @@ rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
 
-![Artery/Vein Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/artery_vein_segmentation_result.png)
+![Artery/Vein Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/01_artery_vein_segmentation_result.png)
 
 **Full example**: See [`examples/01_artery_vein.py`](examples/01_artery_vein.py)
 
@@ -79,7 +115,7 @@ rgb_image = Image.open('fundus.jpg')
 prediction = model.predict(rgb_image)  # Returns [B, H, W] with class values
 ```
 
-![Optic Disc Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/disc_segmentation_result.png)
+![Optic Disc Segmentation Result](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/02_disc_segmentation_result.png)
 
 **Full example**: See [`examples/02_disc_segment.py`](examples/02_disc_segment.py)
 
@@ -101,7 +137,7 @@ fovea_x = prediction[0, 0, 0].item()
 fovea_y = prediction[0, 0, 1].item()
 ```
 
-![Fovea Detection Result](https://github.com/kapong/vascx_simplify/raw/main/examples/fovea_detection_result.png)
+![Fovea Detection Result](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/03_fovea_detection_result.png)
 
 **Full example**: See [`examples/03_fovea_regression.py`](examples/03_fovea_regression.py)
 
@@ -123,13 +159,46 @@ prediction = model.predict(rgb_image)  # Returns [B, 3] with quality scores (alr
 q1_reject, q2_usable, q3_good = prediction[0].tolist()
 ```
 
-![Image Quality Classification Result](https://github.com/kapong/vascx_simplify/raw/main/examples/quality_classification_result.png)
+![Image Quality Classification Result](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/04_quality_classification_result.png)
 
 **Full example**: See [`examples/04_quality_classify.py`](examples/04_quality_classify.py)
 
 ### Contrast Enhancement
 
-Enhance fundus image contrast with GPU-accelerated preprocessing:
+Enhance fundus image contrast with GPU-accelerated preprocessing. Two modes available:
+
+#### Simple Mode (New in v0.1.11)
+
+Pure contrast enhancement without geometric preprocessing:
+
+```python
+from vascx_simplify.preprocess import SimpleContrastEnhance
+from PIL import Image
+import torch
+import numpy as np
+
+# Initialize with auto mode (recommended)
+enhancer = SimpleContrastEnhance(
+    factor='auto',      # Automatic enhancement factor
+    use_fp16=True,      # Mixed precision for speed
+    device='cuda'
+)
+
+# Load and convert image
+rgb_image = Image.open('fundus.jpg')
+img_tensor = torch.from_numpy(np.array(rgb_image)).permute(2, 0, 1).cuda()
+
+# Apply enhancement (single output)
+enhanced = enhancer(img_tensor)
+
+# Manual factor control (2.0, 4.0, 6.0, or 'auto')
+enhancer_4x = SimpleContrastEnhance(factor=4.0)
+enhanced_4x = enhancer_4x(img_tensor)
+```
+
+#### Full Mode (With Fundus Preprocessing)
+
+Complete pipeline with crop, RANSAC ellipse fitting, and contrast enhancement:
 
 ```python
 from vascx_simplify.preprocess import FundusContrastEnhance
@@ -145,18 +214,32 @@ enhancer = FundusContrastEnhance(
 
 # Load and convert image to tensor
 rgb_image = Image.open('fundus.jpg')
-img_tensor = torch.from_numpy(np.array(rgb_image)).permute(2, 0, 1).cuda()  # you can use CPU/GPU to process
+img_tensor = torch.from_numpy(np.array(rgb_image)).permute(2, 0, 1).cuda()
 
 # Apply contrast enhancement
-original, enhanced, bounds = enhancer(img_tensor)
+original, enhanced, bounds = enhancer(img_tensor)  # Returns 3 outputs
 
 # Convert back to numpy for saving/visualization
 enhanced_np = enhanced.cpu().permute(1, 2, 0).numpy()
 ```
 
-![Contrast Enhancement Detailed](https://github.com/kapong/vascx_simplify/raw/main/examples/contrast_enhancement_detailed.png)
+![Contrast Enhancement Detailed](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/07_contrast_enhancement_detailed.png)
 
-**Full example**: See [`examples/07_contrast_enhancement.py`](examples/07_contrast_enhancement.py) for detailed visualization with before/after comparison, zoomed regions, and statistics.
+**Comparison: Simple vs Full Mode**
+
+| Simple Mode | Full Mode |
+|------------|-----------|
+| ![Simple Enhanced](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/09_simple_enhanced.png) | ![Full Enhanced](https://github.com/kapong/vascx_simplify/raw/main/examples/outputs/09_full_enhanced.png) |
+| Pure contrast enhancement | Includes geometric preprocessing (crop, RANSAC) |
+
+**Key Differences**:
+- `SimpleContrastEnhance`: Returns single enhanced image, no geometric preprocessing
+- `FundusContrastEnhance`: Returns (original, enhanced, bounds), includes RANSAC ellipse fitting
+
+**Examples**: 
+- [`examples/07_contrast_enhancement.py`](examples/07_contrast_enhancement.py) - Full mode with detailed visualization
+- [`examples/08_simple_contrast.py`](examples/08_simple_contrast.py) - Simple mode parameter exploration
+- [`examples/09_simple_class_demo.py`](examples/09_simple_class_demo.py) - Quick usage demo
 
 ### Batch Processing
 
