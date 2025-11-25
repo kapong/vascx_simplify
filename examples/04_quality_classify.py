@@ -153,8 +153,8 @@ def main():
     )
 
     plt.tight_layout()
-    plt.savefig("quality_classification_result.png", dpi=150, bbox_inches="tight")
-    print("\nResult saved as 'quality_classification_result.png'")
+    plt.savefig("outputs/04_quality_classification_result.png", dpi=150, bbox_inches="tight")
+    print("\nResult saved as 'outputs/04_quality_classification_result.png'")
     plt.show(block=False)
     plt.pause(5)
     plt.close('all')

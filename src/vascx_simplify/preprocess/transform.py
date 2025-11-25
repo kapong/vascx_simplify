@@ -6,7 +6,7 @@ import kornia.geometry.transform as K
 import numpy as np
 import torch
 
-from .contrast import FundusContrastEnhance
+from .contrast import SimpleFundusEnhance, FundusContrastEnhance
 
 DEFAULT_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -18,6 +18,7 @@ class VASCXTransform:
         use_ce: bool = True,
         use_fp16: bool = True,
         device: Union[torch.device, str] = DEFAULT_DEVICE,
+        Enhancer=SimpleFundusEnhance,
     ):
         """
         Args:
@@ -32,7 +33,7 @@ class VASCXTransform:
         self.use_fp16 = use_fp16
 
         if self.use_ce:
-            self.contrast_enhancer = FundusContrastEnhance(square_size=size, use_fp16=use_fp16)
+            self.contrast_enhancer = Enhancer(square_size=size, use_fp16=use_fp16)
             # 6 channels (rgb + ce)
             self.mean = torch.tensor(
                 [0.485, 0.456, 0.406, 0.485, 0.456, 0.406], device=self.device, dtype=torch.float32

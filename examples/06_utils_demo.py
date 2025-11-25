@@ -130,8 +130,8 @@ def demo_fovea():
     axes[1].set_title(f"Fovea: ({fovea_x:.0f}, {fovea_y:.0f})")
     axes[1].axis("off")
     plt.tight_layout()
-    plt.savefig("demo_fovea_marker.png", dpi=150, bbox_inches="tight")
-    print("Saved: demo_fovea_marker.png")
+    plt.savefig("outputs/06_demo_fovea_marker.png", dpi=150, bbox_inches="tight")
+    print("Saved: outputs/06_demo_fovea_marker.png")
     plt.close()
 
 
@@ -166,8 +166,8 @@ def demo_quality():
     axes[1].set_title(f"{quality_labels[quality_class]} ({confidence:.0%})")
     axes[1].axis("off")
     plt.tight_layout()
-    plt.savefig("demo_quality_badge.png", dpi=150, bbox_inches="tight")
-    print("Saved: demo_quality_badge.png")
+    plt.savefig("outputs/06_demo_quality_badge.png", dpi=150, bbox_inches="tight")
+    print("Saved: outputs/06_demo_quality_badge.png")
     plt.close()
 
 

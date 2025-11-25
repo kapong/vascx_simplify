@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 
 from vascx_simplify import HeatmapRegressionEnsemble, VASCXTransform, from_huggingface
+from vascx_simplify.preprocess import FundusContrastEnhance, SimpleFundusEnhance
 
 
 def main():
@@ -23,7 +24,7 @@ def main():
     model_path = from_huggingface("Eyened/vascx:fovea/fovea_july24.pt")
 
     # Step 2: Initialize preprocessing transform and model
-    model = HeatmapRegressionEnsemble(model_path, VASCXTransform())
+    model = HeatmapRegressionEnsemble(model_path, VASCXTransform(Enhancer=FundusContrastEnhance))
 
     # Step 3: Load and process the image
     print(f"Loading image: {IMG_PATH}")
@@ -96,10 +97,8 @@ def main():
     axes[1].legend(loc="upper right")
 
     plt.tight_layout()
-    plt.savefig("fovea_detection_result.png", dpi=150, bbox_inches="tight")
-    print("\nResult saved as 'fovea_detection_result.png'")
-    plt.show(block=False)
-    plt.pause(5)
+    plt.savefig("outputs/03_fovea_detection_result.png", dpi=150, bbox_inches="tight")
+    print("\nResult saved as 'outputs/03_fovea_detection_result.png'")
     plt.close('all')
 
     # Step 7: Additional visualization - simple scatter plot
@@ -120,10 +119,8 @@ def main():
     ax.axis("off")
     ax.legend()
     plt.tight_layout()
-    plt.savefig("fovea_simple_result.png", dpi=150, bbox_inches="tight")
-    print("Simple result saved as 'fovea_simple_result.png'")
-    plt.show(block=False)
-    plt.pause(5)
+    plt.savefig("outputs/03_fovea_simple_result.png", dpi=150, bbox_inches="tight")
+    print("Simple result saved as 'outputs/03_fovea_simple_result.png'")
     plt.close('all')
 
 

@@ -36,25 +36,26 @@ class HeatmapRegressionEnsemble(EnsembleBase):
         """
         batch_size, n_models, num_keypoints, height, width = heatmaps.shape
 
-        # Reshape to (B*M*K, H*W) for vectorized argmax
-        heatmaps_flat = heatmaps.view(batch_size * n_models * num_keypoints, -1)
+        # Sum heatmaps across models BEFORE finding argmax (better ensemble strategy)
+        # Shape: (B, M, K, H, W) -> (B, K, H, W)
+        heatmaps_summed = torch.sum(heatmaps, dim=1)  # (B, K, H, W)
+
+        # Reshape to (B*K, H*W) for vectorized argmax
+        heatmaps_flat = heatmaps_summed.view(batch_size * num_keypoints, -1)
 
         # Find argmax indices (stays on GPU, returns long tensor)
-        max_indices = torch.argmax(heatmaps_flat, dim=1)  # shape (B*M*K,)
+        max_indices = torch.argmax(heatmaps_flat, dim=1)  # shape (B*K,)
 
         # Convert flat indices to (col, row) coordinates
         # Original: col = max_idx % n_cols, row = max_idx // n_cols
         col = (max_indices % width).to(dtype=torch.float32) + 0.5
         row = (max_indices // width).to(dtype=torch.float32) + 0.5
 
-        # Stack to (B*M*K, 2) with [col, row] order (x, y)
-        outputs = torch.stack([col, row], dim=-1)  # (B*M*K, 2)
+        # Stack to (B*K, 2) with [col, row] order (x, y)
+        outputs = torch.stack([col, row], dim=-1)  # (B*K, 2)
 
-        # Reshape to (B, M, K, 2)
-        outputs = outputs.view(batch_size, n_models, num_keypoints, 2)
-
-        # Average over models
-        outputs = torch.mean(outputs, dim=1)  # (B, K, 2)
+        # Reshape to (B, K, 2)
+        outputs = outputs.view(batch_size, num_keypoints, 2)
 
         # Undo bounds transform
         if is_batch and isinstance(bounds, list):

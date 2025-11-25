@@ -80,8 +80,8 @@ def main():
     axes[2].axis("off")
 
     plt.tight_layout()
-    plt.savefig("artery_vein_segmentation_result.png", dpi=150, bbox_inches="tight")
-    print("Result saved as 'artery_vein_segmentation_result.png'")
+    plt.savefig("outputs/01_artery_vein_segmentation_result.png", dpi=150, bbox_inches="tight")
+    print("Result saved as 'outputs/01_artery_vein_segmentation_result.png'")
     plt.show(block=False)
     plt.pause(5)
     plt.close('all')

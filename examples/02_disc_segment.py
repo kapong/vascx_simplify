@@ -78,8 +78,8 @@ def main():
     axes[1, 1].axis("off")
 
     plt.tight_layout()
-    plt.savefig("disc_segmentation_result.png", dpi=150, bbox_inches="tight")
-    print("Result saved as 'disc_segmentation_result.png'")
+    plt.savefig("outputs/02_disc_segmentation_result.png", dpi=150, bbox_inches="tight")
+    print("Result saved as 'outputs/02_disc_segmentation_result.png'")
     plt.show(block=False)
     plt.pause(5)
     plt.close('all')

@@ -16,7 +16,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from vascx_simplify.preprocess import FundusContrastEnhance
+from vascx_simplify.preprocess import SimpleFundusEnhance
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
 
     # Step 1: Initialize contrast enhancement processor
     print("Initializing contrast enhancement...")
-    enhancer = FundusContrastEnhance(
+    enhancer = SimpleFundusEnhance(
         use_fp16=True,  # Use mixed precision for faster processing on GPU
         square_size=512,  # Optional: crop to square size
     )
@@ -64,8 +64,8 @@ def main():
     axes[1].axis("off")
 
     plt.tight_layout()
-    plt.savefig("contrast_enhancement_result.png", dpi=150, bbox_inches="tight")
-    print("\nResult saved as 'contrast_enhancement_result.png'")
+    plt.savefig("outputs/07_contrast_enhancement_result.png", dpi=150, bbox_inches="tight")
+    print("\nResult saved as 'outputs/07_contrast_enhancement_result.png'")
     plt.show(block=False)
     plt.pause(5)
     plt.close('all')
@@ -99,7 +99,7 @@ def main():
     axes[1, 1].axis("off")
 
     plt.tight_layout()
-    plt.savefig("contrast_enhancement_detailed.png", dpi=150, bbox_inches="tight")
+    plt.savefig("outputs/07_contrast_enhancement_detailed.png", dpi=150, bbox_inches="tight")
     print("Detailed result saved as 'contrast_enhancement_detailed.png'")
     plt.show(block=False)
     plt.pause(5)
@@ -128,13 +128,6 @@ def main():
 
     print("\nContrast Improvement:")
     print(f"  - Std deviation increase: {(enhanced_std / original_std - 1) * 100:+.1f}%")
-
-    print("\nDetected Bounds:")
-    print(f"  - Center: ({bounds['center'][0]:.1f}, {bounds['center'][1]:.1f})")
-    print(f"  - Radius: {bounds['radius']:.1f}")
-    print(f"  - Image size (H, W): {bounds['hw']}")
-    if bounds['lines']:
-        print(f"  - Lines detected: {len(bounds['lines'])}")
 
     print("\n" + "=" * 60)
     print("Done!")
